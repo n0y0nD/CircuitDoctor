@@ -3,9 +3,9 @@ Understand your circuit. Trace the problem. An AI assistant for exploring KiCad 
 
 ## Project status
 
-The local Python environment, FalkorDB Docker setup, and two verified KiCad
-sample netlists are ready. The parser, API, agent, and CircuitDoctor interface
-are planned and are not implemented yet.
+The local Python environment, FalkorDB Docker setup, two verified KiCad sample
+netlists, and the Python netlist parser are ready. Graph loading, diagnostic
+rules, the API, agent, and CircuitDoctor interface are not implemented yet.
 
 ## Initial scope (planned)
 
@@ -35,13 +35,13 @@ git clone https://github.com/n0y0nD/CircuitDoctor.git
 cd CircuitDoctor
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-If the repository and `.venv` already exist, only run `cd CircuitDoctor` and
-`source .venv/bin/activate` from the parent directory.
+If the repository and `.venv` already exist, skip cloning and creating the
+environment. Activate it, then install the requirements as shown above.
 
-The `.venv` folder and local `.env` files are excluded from Git. Python project
-dependencies will be added with the next implementation steps.
+The `.venv` folder and local `.env` files are excluded from Git.
 
 ## Start FalkorDB
 
@@ -101,5 +101,43 @@ The clean path is D13 -> resistor -> LED -> GND. The faulty sample removes only
 the wire from the LED cathode to GND. Both were exported with KiCad and checked
 against the original circuit's connectivity.
 
-These files are not loaded into FalkorDB yet. Parsing and graph loading are the
-next steps.
+These files are not loaded into FalkorDB yet. Graph loading is the next step.
+
+## Read a netlist (Part 3)
+
+From the repository root, with the virtual environment activated:
+
+```bash
+python -m circuitdoctor samples/clean.net
+python -m circuitdoctor samples/missing_ground.net --json
+python -m unittest discover -s tests -v
+```
+
+Replace the sample path with your own KiCad S-expression `.net` file. The first
+command prints every component and net connection; `--json` prints the full
+parsed dictionary. No running database or KiCad installation is required.
+
+Python callers can use `from circuitdoctor import load_netlist` and then
+`circuit = load_netlist("path/to/circuit.net")`. The result contains:
+
+- `components`: references, values, library identities, fields and properties.
+- `libparts`: exported library pin numbers, names and electrical types.
+- `nets`: net codes/names and nodes with `ref`, `pin`, `pinfunction`, `pintype`.
+- `version` and `design`: the export's format version and source metadata.
+
+Pin IDs and net codes remain strings, including leading zeros. Missing node
+pin metadata becomes `unknown`; library definitions remain separate. Unused
+pins and their `+no_connect` markers are retained. Neither a singleton net nor
+a successful parse is reported as an electrical diagnosis.
+
+This step reads connectivity without hardcoded Uno/Nano pin maps. Checks cover
+the real Uno exports and a small Nano-format fixture with different names and
+pins. Board-specific diagnostic support is still planned.
+
+Input must be UTF-8 KiCad S-expression, up to 10 MiB. XML, SPICE, schematic and
+PCB files are not supported by this reader. Malformed input, duplicate pin
+assignments and references to missing components produce an error; the CLI
+exits with status 2 without printing a partial circuit.
+
+Format references: [KiCad netlist documentation](https://docs.kicad.org/9.0/en/eeschema/eeschema.html#netlist_formats)
+and the [sexpdata parser](https://github.com/jd-boyd/sexpdata).
