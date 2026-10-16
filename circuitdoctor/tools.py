@@ -39,6 +39,11 @@ def explain_net(store, circuit_id, *, net_code=None, net_name=None, ref=None, pi
             raise ValueError("Connection identifiers must be nonempty strings.")
 
     facts = store.connection_facts(circuit_id, net_code=net_code, net_name=net_name, ref=ref, pin=pin)
+    return describe_connection(facts)
+
+
+def describe_connection(facts):
+    """Format graph facts and evidence without another database request."""
     nodes, edges, paths, observations, descriptions = {}, {}, [], [], []
 
     def add_pin(pin):

@@ -58,7 +58,7 @@ class WorkspaceApiTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {
                 "parser": "ready", "graph_storage": "connected" if connected else "unavailable",
-                "review": "not_implemented",
+                "review": "connectivity_only",
             })
 
     def test_invalid_circuit_upload_never_reaches_storage(self):

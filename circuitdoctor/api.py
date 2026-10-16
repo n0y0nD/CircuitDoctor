@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from .parser import MAX_FILE_BYTES, NetlistParseError, load_netlist, parse_netlist
 from .storage import AmbiguousConnection, ConnectionNotFound, CircuitNotFound, StorageUnavailable, get_store
 from .tools import explain_net
+from .review import check_rules
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = {"clean": "clean.net", "missing-ground": "missing_ground.net"}
@@ -35,7 +36,7 @@ def status():
     except StorageUnavailable:
         connected = False
     return {"parser": "ready", "graph_storage": "connected" if connected else "unavailable",
-            "review": "not_implemented"}
+            "review": "connectivity_only"}
 
 
 @app.get("/api/samples/{name}")
@@ -111,6 +112,11 @@ def explain_connection(circuit_id: str, selection: ExplainRequest):
         raise HTTPException(404, str(exc)) from exc
     except AmbiguousConnection as exc:
         raise HTTPException(409, str(exc)) from exc
+
+
+@app.post("/api/circuits/{circuit_id}/review")
+def review_circuit(circuit_id: str):
+    return check_rules(get_store(), circuit_id)
 
 
 # After `npm run build`, the same local API can serve the complete workspace.

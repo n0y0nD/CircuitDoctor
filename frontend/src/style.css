@@ -213,3 +213,22 @@ dialog p { font-size: 12px; line-height: 1.7; color: var(--muted); }
   .explorer-panel.expanded { right: 330px; }
   .explorer-panel.expanded + .inspector { position: fixed; z-index: 51; right: 12px; top: 12px; bottom: 12px; width: 306px; overflow-y: auto; }
 }
+
+.review-panel { margin: 0 0 20px; padding: 20px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.review-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.review-heading h2 { margin: 0; font-size: 15px; }
+.review-heading p, .review-note { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 6px 0 0; }
+.review-summary { font-size: 14px; margin: 20px 0 6px; }
+.finding-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 10px; margin-top: 14px; max-height: 360px; overflow-y: auto; }
+.finding-card { text-align: left; padding: 15px; background: #fffaf1; border: 1px solid #eddbba; border-radius: 8px; color: #684c22; overflow-wrap: anywhere; }
+.finding-card.info { background: #f7faf8; border-color: var(--line); color: #365646; }
+.finding-card:hover { border-color: #16836b; }
+.finding-card > span, .finding-severity { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 8px; }
+.finding-card strong { font-size: 13px; }
+.finding-card p, .finding-detail p { font-size: 12px; line-height: 1.8; }
+.finding-card small { font-size: 11px; color: #16836b; }
+.review-details { border-top: 1px solid var(--line); margin-top: 15px; padding-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.8; }
+.review-details summary { cursor: pointer; color: #365646; }
+.finding-detail { padding: 18px; background: #fffaf1; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.finding-detail h3 { font-size: 14px; }
+@media (max-width: 500px) { .review-heading { align-items: stretch; flex-direction: column; } }

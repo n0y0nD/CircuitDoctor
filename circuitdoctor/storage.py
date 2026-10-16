@@ -232,6 +232,44 @@ class CircuitStore:
                 "selected_pin": selected_pin, "nets": list(nets.values()), "queries": queries}
 
 
+    def review_facts(self, circuit_id):
+        """Read all nets and pin memberships in a fixed number of graph queries."""
+        name = self.graph_name(circuit_id)
+        graph = self.db.select_graph(name)
+        queries = []
+
+        def query(cypher):
+            queries.append({"cypher": cypher, "parameters": {}})
+            return graph.ro_query(cypher, timeout=10000).result_set
+
+        try:
+            if not self.db.connection.exists(name):
+                raise CircuitNotFound(circuit_id)
+            if not query("MATCH (m:Circuit {ready:true}) RETURN m.id"):
+                raise CircuitNotFound(circuit_id)
+            component_count = query("MATCH (c:Component) RETURN count(c)")[0][0]
+            nets = {code: {"code": code, "name": label, "pins": []}
+                    for code, label in query("MATCH (n:Net) RETURN n.code,n.name ORDER BY n.position")}
+            rows = query("MATCH (c:Component)-[:HAS_PIN]->(p:Pin) "
+                         "OPTIONAL MATCH (p)-[:ON_NET]->(n:Net) "
+                         "RETURN c.ref,c.value,p.number,p.name,p.type,p.pinfunction,p.pintype,n.code "
+                         "ORDER BY c.position,p.number")
+        except RedisError as exc:
+            raise StorageUnavailable("Could not review connections from FalkorDB. Please try again.") from exc
+        pins, unassigned = {}, []
+        for ref, value, number, label, library_type, function, exported_type, code in rows:
+            record = {"ref": ref, "component_value": value, "pin": number, "name": label,
+                      "library_type": library_type, "pinfunction": function, "pintype": exported_type}
+            pins[(ref, number)] = record
+            if code is None:
+                unassigned.append(record)
+            else:
+                nets[code]["pins"].append(record)
+        return {"source": "falkordb", "circuit_id": circuit_id, "graph_name": name,
+                "component_count": component_count, "nets": list(nets.values()),
+                "pins": list(pins.values()), "unassigned_pins": unassigned, "queries": queries}
+
+
 class ConnectionNotFound(LookupError):
     """The selected component, pin or net does not exist in this circuit."""
 

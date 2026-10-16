@@ -3,6 +3,7 @@ import "./style.css";
 import { icon } from "./icons";
 import { CircuitGraph } from "./graph";
 import { ExplanationRequest, type ExplanationState } from "./explanation";
+import { ReviewRequest, type ReviewState, type Finding } from "./review";
 import {
   componentKind,
   displayValue,
@@ -27,6 +28,18 @@ let showUnused = false;
 let requestId = 0;
 const explanationRequest = new ExplanationRequest();
 let explanation: ExplanationState = { status: "idle" };
+const reviewRequest = new ReviewRequest();
+let review: ReviewState = { status: "idle" };
+let selectedFinding: Finding | null = null;
+
+function clearReview() {
+  reviewRequest.cancel();
+  review = { status: "idle" };
+  selectedFinding = null;
+  $("#selected-finding").hidden = true;
+  $("#selected-finding").innerHTML = "";
+  renderReview();
+}
 
 function clearExplanation() {
   explanationRequest.cancel();
@@ -53,11 +66,15 @@ $("#app").innerHTML = `
       <span class="file-note">KiCad netlist · Up to 10 MiB</span>
     </div>
     <button class="text-button help-trigger">Where do I get a .net file? ${icon("chevron", 14)}</button>
-    <p class="scope-note">Explore connections now. Electrical checks and AI explanations are still in development.</p>
+    <p class="scope-note">Explore connections and run a basic connectivity review. Voltage checks and AI chat are still in development.</p>
   </section>
   <div id="loading-overlay" class="loading-overlay" role="status" hidden><span class="spinner"></span> Reading your circuit…</div>
   <section class="circuit-section" id="circuit-section" aria-label="Your uploaded circuit" hidden>
     <div class="circuit-topline"><div class="circuit-title-group"><span class="file-icon">${icon("file", 23)}</span><div><h1 id="circuit-title"></h1><p id="circuit-summary"></p></div></div><button class="icon-button" id="clear-circuit" aria-label="Close circuit and return to upload" title="Close circuit">${icon("close", 19)}</button></div>
+    <section class="review-panel" aria-label="Circuit review">
+      <div class="review-heading"><div><h2>Connectivity review</h2><p>Check the connections in your uploaded file.</p></div><button id="run-review" class="button primary">Run review</button></div>
+      <div id="review-results" aria-live="polite"></div>
+    </section>
     <div class="workbench">
       <section class="explorer-panel" aria-label="Circuit explorer">
         <div class="explorer-toolbar"><div class="view-tabs" role="tablist" aria-label="Circuit views">
@@ -69,7 +86,7 @@ $("#app").innerHTML = `
         <div class="canvas-wrap"><div id="graph-view" class="graph-view" role="tabpanel" aria-label="Circuit graph. Use Components and Connections for keyboard-accessible details."></div><div id="list-view" class="list-view" role="tabpanel" hidden></div><div id="canvas-empty" class="canvas-empty" hidden><h2>No components in this file</h2><p>Upload a netlist with components and connections to explore.</p></div><div class="graph-controls" id="graph-controls"><button class="icon-button" id="zoom-out" aria-label="Zoom out">${icon("minus", 16)}</button><span id="zoom-value">100%</span><button class="icon-button" id="zoom-in" aria-label="Zoom in">${icon("plus", 16)}</button><button class="icon-button" id="fit-view" aria-label="Fit graph to screen">${icon("fit", 17)}</button><button class="reset-layout" id="reset-layout" title="Restore automatic placement">Reset layout</button></div><span class="canvas-hint" id="canvas-hint">Drag parts / ○ wire bends · Double-click part to zoom</span></div>
         <div class="graph-footer"><div class="legend"><span><i class="legend-component"></i> Component</span><span><i class="legend-net"></i> Wire junction</span><span><i class="legend-single"></i> Single pin</span></div><span id="graph-summary"></span></div>
       </section>
-      <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="inspector-body"></div><section id="explanation-panel" class="explanation-panel" aria-label="Connection explanation" hidden></section></aside>
+      <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="selected-finding" hidden></div><div id="inspector-body"></div><section id="explanation-panel" class="explanation-panel" aria-label="Connection explanation" hidden></section></aside>
     </div>
     <p class="scope-note">Gold sockets are connected pins. Drag the open circles to route wires. Board labels form an enlarged pin map, not a physical wiring template.</p>
     <details id="storage-details" class="file-details"><summary>File details</summary><p id="read-status"></p><p id="storage-info"></p><div class="file-actions"><button class="button secondary" id="reload-circuit">Reload saved circuit</button><button class="button secondary" data-view="data">View JSON</button><button class="button secondary" id="copy-json">Copy JSON</button></div><pre class="json-view" id="storage-query"></pre></details>
@@ -116,6 +133,7 @@ async function readCircuit(
   options: RequestInit = {},
 ) {
   clearExplanation();
+  clearReview();
   renderExplanation();
   const currentRequest = ++requestId;
   setBusy(true);
@@ -146,6 +164,7 @@ async function readCircuit(
       throw new Error("The server did not return a stored circuit.");
     }
     clearExplanation();
+    clearReview();
     circuit = result;
     filename = result.storage.filename || name;
     history.replaceState(null, "", `#circuit=${result.storage.circuit_id}`);
@@ -207,8 +226,10 @@ function renderCircuit() {
   $("#canvas-empty").hidden = circuit.components.length > 0 || circuit.nets.length > 0;
   renderView();
   renderInspector();
+  renderReview();
 }
 function selectItem(value: Selection) {
+  selectedFinding = null;
   clearExplanation();
   selection = value;
   graph?.select(selection);
@@ -248,7 +269,7 @@ function renderView() {
     );
     graph.select(selection);
     graph.search(query);
-    graph.highlightEvidence(explanation.status === "success" ? explanation.result : null);
+    graph.highlightEvidence(selectedFinding || (explanation.status === "success" ? explanation.result : null));
   } else renderList();
   const shown = circuit.nets.filter((n) => showUnused || !isUnused(n)).length;
   $("#graph-summary").textContent =
@@ -279,6 +300,9 @@ function renderList() {
   }
 }
 function renderInspector() {
+  const findingPanel = $("#selected-finding");
+  findingPanel.hidden = !selectedFinding;
+  findingPanel.innerHTML = selectedFinding ? `<div class="finding-detail"><span class="finding-severity">${selectedFinding.severity === "warning" ? "Check this connection" : "Information"}</span><h3>${esc(selectedFinding.title)}</h3><p>${esc(selectedFinding.message)}</p><p><strong>What to check:</strong> ${esc(selectedFinding.suggestion)}</p></div>` : "";
   renderExplanation();
   if (!circuit || !selection) {
     $("#inspector-body").innerHTML =
@@ -320,6 +344,8 @@ function renderExplanation() {
 }
 async function explainSelection() {
   if (!circuit || !selection || selection.kind === "component") return;
+  selectedFinding = null;
+  renderInspector();
   graph?.highlightEvidence(null);
   await explanationRequest.run(circuit.storage.circuit_id, selection, state => {
     explanation = state;
@@ -328,8 +354,50 @@ async function explainSelection() {
   });
 }
 
+function renderReview() {
+  const button = $<HTMLButtonElement>("#run-review");
+  button.disabled = review.status === "loading";
+  button.textContent = review.status === "loading" ? "Reviewing…" : review.status === "success" ? "Run again" : review.status === "error" ? "Retry review" : "Run review";
+  const panel = $("#review-results");
+  if (review.status === "idle") { panel.innerHTML = ""; return; }
+  if (review.status === "loading") { panel.innerHTML = '<p class="review-note" role="status">Reading saved connections from FalkorDB…</p>'; return; }
+  if (review.status === "error") { panel.innerHTML = `<p class="explanation-error" role="alert">${esc(review.message)}</p>`; return; }
+  const result = review.result;
+  const warnings = result.findings.filter(f => f.severity === "warning");
+  const information = result.findings.filter(f => f.severity === "info");
+  const cards = (items: Finding[]) => items.map(f => `<button class="finding-card ${f.severity}" data-finding="${esc(f.id)}"><span>${f.severity === "warning" ? "Possible issue" : "Information"}</span><strong>${esc(f.title)}</strong><p>${esc(f.message)}</p><small>Inspect connection →</small></button>`).join("");
+  const heading = result.status === "incomplete" ? "Not enough circuit data to review" : warnings.length ? `${warnings.length} connection${warnings.length === 1 ? "" : "s"} to check` : "No single-pin warnings found";
+  panel.innerHTML = `<h3 class="review-summary">${esc(heading)}</h3><p class="review-note">${result.summary.nets} nets checked · ${result.summary.marked_unused_pins} pins marked unused. This is a basic connectivity review, not confirmation that the circuit works.</p><div class="finding-list">${cards(warnings)}</div>${information.length ? `<details class="review-details"><summary>${information.length} informational finding${information.length === 1 ? "" : "s"}</summary><div class="finding-list">${cards(information)}</div></details>` : ""}<details class="review-details"><summary>What we cannot verify yet</summary>${result.cannot_verify.map(item => `<p><strong>${esc(item.check)}:</strong> ${esc(item.reason)}</p>`).join("")}<p>${result.summary.unknown_pin_names} pins have no name metadata; ${result.summary.unknown_pin_types} have no type metadata. No board pin mapping or electrical limits were guessed.</p></details>`;
+}
+async function runReview() {
+  if (!circuit) return;
+  clearExplanation();
+  selectedFinding = null;
+  renderInspector();
+  await reviewRequest.run(circuit.storage.circuit_id, state => { review = state; renderReview(); });
+}
+function inspectFinding(id: string) {
+  if (review.status !== "success") return;
+  const finding = review.result.findings.find(f => f.id === id);
+  if (!finding) return;
+  const selector = finding.selection;
+  selectItem('net_code' in selector ? { kind: "net", id: selector.net_code } : {
+    kind: "pin", id: `p:${JSON.stringify([selector.ref, selector.pin])}`, ref: selector.ref, pin: selector.pin,
+  });
+  selectedFinding = finding;
+  view = "graph";
+  query = "";
+  $<HTMLInputElement>("#search").value = "";
+  renderView();
+  renderInspector();
+  $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
 document.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
+  if (target.closest("#run-review:not(:disabled)")) void runReview();
+  const finding = target.closest<HTMLElement>("[data-finding]");
+  if (finding) inspectFinding(finding.dataset.finding!);
   if (target.closest(".upload-trigger:not(:disabled)")) $("#file-input").click();
   if (target.closest(".help-trigger"))
     $<HTMLDialogElement>("#help-dialog").showModal();
@@ -405,6 +473,7 @@ document.addEventListener("keydown", event => {
 $("#clear-circuit").onclick = () => {
   setExpanded(false);
   clearExplanation();
+  clearReview();
   requestId++; // Discard any pending response without deleting stored data.
   graph?.destroy();
   graph = null;

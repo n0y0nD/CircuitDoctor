@@ -1,0 +1,54 @@
+"""Conservative connectivity review; no datasheet assumptions or LLM verdicts."""
+
+from .tools import _known, _marked_unused, _pin_label, describe_connection
+
+
+def check_rules(store, circuit_id):
+    facts = store.review_facts(circuit_id)
+    findings = []
+    unused = sum(_marked_unused(pin) for pin in facts["pins"])
+
+    def add(rule, severity, title, message, suggestion, *, net=None, pin=None):
+        selection = {"net_code": net["code"]} if net is not None else {"ref": pin["ref"], "pin": pin["pin"]}
+        evidence = describe_connection({"selected_pin": pin, "nets": [net] if net is not None else []})["evidence"]
+        findings.append({"id": f"finding-{len(findings) + 1}", "rule": rule,
+                         "severity": severity, "title": title, "message": message,
+                         "suggestion": suggestion, "selection": selection, "evidence": evidence})
+
+    for net in facts["nets"]:
+        members = net["pins"]
+        if len(members) == 1 and not _marked_unused(members[0]):
+            add("single_pin_net", "warning", "Only one pin on this net",
+                f'{_pin_label(members[0])} is the only pin on net {net["name"]!r}. No second connection is recorded.',
+                "Check whether this pin should connect to another part in the schematic. If it is intentionally unused, mark it accordingly and export again. A single-pin net alone does not prove a fault.", net=net)
+        elif not members:
+            add("empty_net", "info", "Net has no pin connections",
+                f'Net {net["name"]!r} has no pin memberships in the saved graph.',
+                "Check the source schematic and export again if this net should contain connections.", net=net)
+
+    for pin in facts["unassigned_pins"]:
+        if not _marked_unused(pin):
+            add("unassigned_pin", "info", "Pin connection cannot be verified",
+                f'{_pin_label(pin)} exists in the saved graph but has no net membership.',
+                "Check the schematic if this pin is needed. The export alone does not tell us whether it should be connected; this is not a confirmed wiring fault.", pin=pin)
+
+    warning_count = sum(item["severity"] == "warning" for item in findings)
+    empty = not facts["component_count"] or not facts["nets"]
+    unknown_names = sum(not _known(pin["name"]) and not _known(pin["pinfunction"]) for pin in facts["pins"])
+    unknown_types = sum(not _known(pin["library_type"]) and not _known(pin["pintype"]) for pin in facts["pins"])
+    cannot_verify = [
+        {"check": "Voltage compatibility", "reason": "Verified component voltage limits and power-source information are not available yet."},
+        {"check": "Required connections and pull-ups", "reason": "Connectivity alone does not establish which pins or external resistors the design requires."},
+        {"check": "Circuit operation", "reason": "Firmware, current, physical wiring and component health are not checked."},
+    ]
+    if empty:
+        cannot_verify.insert(0, {"check": "Complete connectivity review", "reason": "This export has no components or no nets to review."})
+    return {"tool": "check_rules", "source": "falkordb", "circuit_id": circuit_id,
+            "scope": "connectivity_only", "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
+            "summary": {"components": facts["component_count"], "nets": len(facts["nets"]),
+                        "pins": len(facts["pins"]), "warnings": warning_count,
+                        "information": len(findings) - warning_count, "marked_unused_pins": unused,
+                        "unknown_pin_names": unknown_names, "unknown_pin_types": unknown_types},
+            "findings": findings, "cannot_verify": cannot_verify, "queries": facts["queries"],
+            "limitations": ["Basic connectivity review only. No warnings does not mean the circuit is electrically correct.",
+                            "Unused markers are read from pin metadata, not inferred from net names."]}

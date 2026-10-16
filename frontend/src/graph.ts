@@ -196,7 +196,7 @@ export class CircuitGraph {
     else this.cy.edges().filter(e=>e.data('pinId')===selection.id).addClass('connected');
     if(selection.kind==='net') this.cy.nodes().filter(n=>n.data('code')===selection.id && n.data('kind')==='bend').addClass('active');
   }
-  highlightEvidence(result: Explanation | null) {
+  highlightEvidence(result: Pick<Explanation, 'evidence'> | null) {
     this.cy.elements().removeClass('evidence evidence-muted');
     if (!result) return;
     const ids = new Set(result.evidence.nodes.map(n => n.id));

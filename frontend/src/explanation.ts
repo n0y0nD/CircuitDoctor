@@ -58,7 +58,7 @@ export class ExplanationRequest {
 }
 
 // Every rendered wire segment represents one specific Pin → Net membership.
-export function evidenceMemberships(result: Explanation) {
+export function evidenceMemberships(result: Pick<Explanation, 'evidence'>) {
   return new Set(result.evidence.edges.filter(edge => edge.type === 'ON_NET')
     .map(edge => JSON.stringify([edge.source, edge.target])));
 }
