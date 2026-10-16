@@ -1,6 +1,7 @@
 """Local netlist upload, FalkorDB storage and workspace API."""
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -14,6 +15,7 @@ from .storage import AmbiguousConnection, ConnectionNotFound, CircuitNotFound, S
 from .tools import explain_net
 from .review import check_rules
 from .power import trace_power
+from .chat import ask_circuit, chat_status, ChatError, CHAT_LOCK
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = {"clean": "clean.net", "missing-ground": "missing_ground.net"}
@@ -130,6 +132,46 @@ def power_trace(circuit_id: str, selection: ExplainRequest):
         raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+class ChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=12000)
+
+
+class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str = Field(min_length=1, max_length=2000)
+    history: list[ChatMessage] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def valid_conversation(self):
+        if not self.message.strip():
+            raise ValueError("Enter a question.")
+        if len(self.history) % 2 or any(m.role != ("user" if i % 2 == 0 else "assistant") for i, m in enumerate(self.history)):
+            raise ValueError("History must contain user/assistant pairs.")
+        return self
+
+
+@app.get("/api/chat/status")
+def ai_status():
+    try:
+        return chat_status()
+    except ChatError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@app.post("/api/circuits/{circuit_id}/chat")
+def chat(circuit_id: str, body: ChatRequest):
+    if not CHAT_LOCK.acquire(blocking=False):
+        raise HTTPException(429, "A chat request is already running. Please wait for it to finish.")
+    try:
+        return ask_circuit(get_store(), circuit_id, body.message.strip(), [m.model_dump() for m in body.history])
+    except ChatError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+    finally:
+        CHAT_LOCK.release()
 
 
 # After `npm run build`, the same local API can serve the complete workspace.

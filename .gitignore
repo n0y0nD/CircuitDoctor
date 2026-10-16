@@ -30,3 +30,7 @@ htmlcov/
 node_modules/
 frontend/dist/
 *.tsbuildinfo
+
+# Server-only Gemini key and atomic setup temporary files
+.gemini-api-key
+.gemini-key-*

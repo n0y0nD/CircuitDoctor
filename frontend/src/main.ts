@@ -1,5 +1,7 @@
 import "@fontsource-variable/inter";
 import "./style.css";
+import { ChatPanel } from "./chat-panel";
+import type { Explanation } from "./explanation";
 import { icon } from "./icons";
 import { CircuitGraph } from "./graph";
 import { ExplanationRequest, type ExplanationState } from "./explanation";
@@ -31,6 +33,7 @@ let explanation: ExplanationState = { status: "idle" };
 const reviewRequest = new ReviewRequest();
 let review: ReviewState = { status: "idle" };
 let selectedFinding: Finding | null = null;
+let chatEvidence: Pick<Explanation, "evidence"> | null = null;
 
 function clearReview() {
   reviewRequest.cancel();
@@ -42,6 +45,7 @@ function clearReview() {
 }
 
 function clearExplanation() {
+  chatEvidence = null;
   explanationRequest.cancel();
   explanation = { status: "idle" };
   graph?.highlightEvidence(null);
@@ -66,7 +70,7 @@ $("#app").innerHTML = `
       <span class="file-note">KiCad netlist · Up to 10 MiB</span>
     </div>
     <button class="text-button help-trigger">Where do I get a .net file? ${icon("chevron", 14)}</button>
-    <p class="scope-note">Explore connections and check Arduino power-rail wiring. Full electrical diagnosis and AI chat are still in development.</p>
+    <p class="scope-note">Explore connections and check Arduino power-rail wiring. Ask Gemini about your connections. Full electrical diagnosis is not available.</p>
   </section>
   <div id="loading-overlay" class="loading-overlay" role="status" hidden><span class="spinner"></span> Reading your circuit…</div>
   <section class="circuit-section" id="circuit-section" aria-label="Your uploaded circuit" hidden>
@@ -89,6 +93,7 @@ $("#app").innerHTML = `
       <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="selected-finding" hidden></div><div id="inspector-body"></div><section id="explanation-panel" class="explanation-panel" aria-label="Connection explanation" hidden></section></aside>
     </div>
     <p class="scope-note">Gold sockets are connected pins. Drag the open circles to route wires. Board labels form an enlarged pin map, not a physical wiring template.</p>
+    <section id="chat-panel" class="chat-panel" aria-label="Ask about your circuit" hidden></section>
     <details id="storage-details" class="file-details"><summary>File details</summary><p id="read-status"></p><p id="storage-info"></p><div class="file-actions"><button class="button secondary" id="reload-circuit">Reload saved circuit</button><button class="button secondary" data-view="data">View JSON</button><button class="button secondary" id="copy-json">Copy JSON</button></div><pre class="json-view" id="storage-query"></pre></details>
   </section>
 </main>
@@ -96,6 +101,21 @@ $("#app").innerHTML = `
 <div class="drop-overlay" id="drop-overlay" hidden>${icon("upload", 32)}<strong>Drop your .net file</strong></div>
 <dialog id="help-dialog" aria-labelledby="help-title"><button class="icon-button dialog-close" id="close-help" aria-label="Close help">${icon("close")}</button><h2 id="help-title">Export your circuit from KiCad</h2><ol><li>Open your circuit in the schematic editor.</li><li>Select <strong>File → Export → Netlist</strong>.</li><li>Choose the <strong>KiCad</strong> format and save the <strong>.net</strong> file.</li><li>Upload that file here to explore its connections.</li></ol><p>Uploads are stored in your local database. Images, PCB files and schematics cannot be uploaded directly.</p><button class="button primary" id="got-it">Got it</button></dialog>
 <div id="toast" class="toast" role="status" hidden></div>`;
+
+const chatPanel = new ChatPanel($("#chat-panel"), evidence => {
+  clearExplanation();
+  selectedFinding = null;
+  chatEvidence = { evidence };
+  view = "graph";
+  query = "";
+  $("#search").setAttribute("value", "");
+  $<HTMLInputElement>("#search").value = "";
+  showUnused = true;
+  $<HTMLInputElement>("#unused-toggle").checked = true;
+  renderView();
+  renderInspector();
+  $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
+});
 
 function connectionState(online: boolean) {
   const element = $("#connection-status");
@@ -135,6 +155,7 @@ async function readCircuit(
   clearExplanation();
   clearReview();
   renderExplanation();
+  chatPanel.setCircuit("");
   const currentRequest = ++requestId;
   setBusy(true);
   notice();
@@ -166,6 +187,7 @@ async function readCircuit(
     clearExplanation();
     clearReview();
     circuit = result;
+    chatPanel.setCircuit(result.storage.circuit_id);
     filename = result.storage.filename || name;
     history.replaceState(null, "", `#circuit=${result.storage.circuit_id}`);
     view = "graph";
@@ -186,6 +208,7 @@ async function readCircuit(
     notice(
       `${message}${circuit ? " Your previous circuit is still displayed." : ""}`,
     );
+    if (circuit) chatPanel.setCircuit(circuit.storage.circuit_id);
     if (error instanceof TypeError) connectionState(false);
   } finally {
     if (currentRequest === requestId) setBusy(false);
@@ -269,7 +292,7 @@ function renderView() {
     );
     graph.select(selection);
     graph.search(query);
-    graph.highlightEvidence(selectedFinding || (explanation.status === "success" ? explanation.result : null));
+    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null));
   } else renderList();
   const shown = circuit.nets.filter((n) => showUnused || !isUnused(n)).length;
   $("#graph-summary").textContent =
@@ -345,6 +368,7 @@ function renderExplanation() {
 async function explainSelection(mode: "explain" | "power-trace" = "explain") {
   if (!circuit || !selection || selection.kind === "component") return;
   selectedFinding = null;
+  chatEvidence = null;
   renderInspector();
   graph?.highlightEvidence(null);
   await explanationRequest.run(circuit.storage.circuit_id, selection, state => {
@@ -476,6 +500,7 @@ document.addEventListener("keydown", event => {
 });
 $("#clear-circuit").onclick = () => {
   setExpanded(false);
+  chatPanel.setCircuit("");
   clearExplanation();
   clearReview();
   requestId++; // Discard any pending response without deleting stored data.

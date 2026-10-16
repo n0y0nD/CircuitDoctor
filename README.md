@@ -229,3 +229,27 @@ The checks cover generic Uno/Nano exports, unknown components, multiple pins on
 a net, upload isolation, database read-back and failed-import cleanup. They
 create and remove only their own temporary graphs. Without the environment
 flag, the real-database tests are skipped.
+
+### Optional Gemini chat
+
+Save a Google AI Studio key on this machine using hidden terminal input:
+
+```bash
+.venv/bin/python -m circuitdoctor.configure_gemini
+```
+
+The backend reads `GEMINI_API_KEY` or the ignored, owner-readable
+`.gemini-api-key` file. Never put a key in frontend code. The default model is
+`gemini-3.5-flash-lite`; set `GEMINI_MODEL` on the API process to change it.
+After uploading a circuit, use **Ask about your circuit** (or **Check again**
+after saving the key). Sending a question shares chat and circuit facts with
+Google. Free-tier data may be used to improve Google's products; availability
+and quota depend on the project and model. See
+[Google's pricing and data-use table](https://ai.google.dev/gemini-api/docs/pricing).
+
+Chat uses four read-only graph tools: `circuit_overview`, `explain_net`,
+`check_rules`, and `trace_power`. Tool evidence and Cypher are available below
+answers. This adds explanations, not simulation or full electrical diagnosis.
+Requests are bounded to five model calls and eight tool calls; quota errors
+are shown without automatic retries. Upload, review and tracing work without
+an AI key. This workspace remains a local app, not an authenticated public service.
