@@ -2,13 +2,16 @@
 
 from pathlib import Path
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from .parser import MAX_FILE_BYTES, NetlistParseError, load_netlist, parse_netlist
-from .storage import CircuitNotFound, StorageUnavailable, get_store
+from .storage import AmbiguousConnection, ConnectionNotFound, CircuitNotFound, StorageUnavailable, get_store
+from .tools import explain_net
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = {"clean": "clean.net", "missing-ground": "missing_ground.net"}
@@ -81,6 +84,33 @@ def store_sample(name: str):
 @app.get("/api/circuits/{circuit_id}")
 def stored_circuit(circuit_id: str):
     return get_store().read(circuit_id)
+
+
+class ExplainRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    net_code: str | None = Field(default=None, min_length=1)
+    net_name: str | None = Field(default=None, min_length=1)
+    ref: str | None = Field(default=None, min_length=1)
+    pin: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def exactly_one_selector(self):
+        pin_selector = self.ref is not None or self.pin is not None
+        if sum((self.net_code is not None, self.net_name is not None, pin_selector)) != 1:
+            raise ValueError("Supply net_code, net_name, or both ref and pin.")
+        if pin_selector and (self.ref is None or self.pin is None):
+            raise ValueError("A pin lookup needs both ref and pin.")
+        return self
+
+
+@app.post("/api/circuits/{circuit_id}/explain")
+def explain_connection(circuit_id: str, selection: ExplainRequest):
+    try:
+        return explain_net(get_store(), circuit_id, **selection.model_dump())
+    except ConnectionNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except AmbiguousConnection as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 # After `npm run build`, the same local API can serve the complete workspace.

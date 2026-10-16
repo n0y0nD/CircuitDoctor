@@ -175,3 +175,66 @@ class CircuitStore:
                         "filename": filename, "sample": sample, "pins": pin_count,
                         "connections": len(connections), "query": READ_CONNECTIONS},
         }
+
+    def connection_facts(self, circuit_id, *, net_code=None, net_name=None, ref=None, pin=None):
+        """Read only the selected connection, using parameterized graph traversals."""
+        graph_name = self.graph_name(circuit_id)
+        graph = self.db.select_graph(graph_name)
+        queries = []
+
+        def query(cypher, parameters=None):
+            parameters = parameters or {}
+            queries.append({"cypher": cypher, "parameters": parameters})
+            return graph.ro_query(cypher, parameters, timeout=10000).result_set
+
+        def pin_record(row):
+            ref, value, number, name, library_type, function, exported_type = row
+            return {"ref": ref, "component_value": value, "pin": number,
+                    "name": name, "library_type": library_type,
+                    "pinfunction": function, "pintype": exported_type}
+
+        try:
+            if not self.db.connection.exists(graph_name):
+                raise CircuitNotFound(circuit_id)
+            if not query("MATCH (m:Circuit {ready:true}) RETURN m.id"):
+                raise CircuitNotFound(circuit_id)
+            selected_pin = None
+            if ref is not None:
+                rows = query("MATCH (c:Component {ref:$ref})-[:HAS_PIN]->(p:Pin {number:$pin}) "
+                             "RETURN c.ref,c.value,p.number,p.name,p.type,p.pinfunction,p.pintype",
+                             {"ref": ref, "pin": pin})
+                if not rows:
+                    raise ConnectionNotFound("That component/pin is not present in this circuit.")
+                selected_pin = pin_record(rows[0])
+                net_rows = query("MATCH (c:Component {ref:$ref})-[:HAS_PIN]->(p:Pin {number:$pin})"
+                                 "-[:ON_NET]->(n:Net) RETURN n.code,n.name ORDER BY n.position",
+                                 {"ref": ref, "pin": pin})
+            elif net_code is not None:
+                net_rows = query("MATCH (n:Net {code:$code}) RETURN n.code,n.name", {"code": net_code})
+            else:
+                net_rows = query("MATCH (n:Net {name:$name}) RETURN n.code,n.name ORDER BY n.position",
+                                 {"name": net_name})
+                if len(net_rows) > 1:
+                    raise AmbiguousConnection("Multiple nets have that name. Select a net_code instead.")
+            if selected_pin is None and not net_rows:
+                raise ConnectionNotFound("That net is not present in this circuit. Use its exact name or code.")
+            nets = {code: {"code": code, "name": name, "pins": []} for code, name in net_rows}
+            if nets:
+                rows = query("MATCH (c:Component)-[:HAS_PIN]->(p:Pin)-[:ON_NET]->(n:Net) "
+                             "WHERE n.code IN $codes RETURN n.code,c.ref,c.value,p.number,p.name,"
+                             "p.type,p.pinfunction,p.pintype ORDER BY n.position,c.position,p.number",
+                             {"codes": list(nets)})
+                for code, *record in rows:
+                    nets[code]["pins"].append(pin_record(record))
+        except RedisError as exc:
+            raise StorageUnavailable("Could not query circuit connections from FalkorDB. Please try again.") from exc
+        return {"source": "falkordb", "circuit_id": circuit_id, "graph_name": graph_name,
+                "selected_pin": selected_pin, "nets": list(nets.values()), "queries": queries}
+
+
+class ConnectionNotFound(LookupError):
+    """The selected component, pin or net does not exist in this circuit."""
+
+
+class AmbiguousConnection(LookupError):
+    """A name identifies more than one net; a code is needed."""
