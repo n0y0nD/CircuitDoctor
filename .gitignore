@@ -25,3 +25,8 @@ htmlcov/
 *.lck
 ~*.kicad_sch
 *-backups/
+
+# Frontend dependencies and generated builds
+node_modules/
+frontend/dist/
+*.tsbuildinfo

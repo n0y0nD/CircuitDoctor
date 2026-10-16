@@ -3,9 +3,53 @@ Understand your circuit. Trace the problem. An AI assistant for exploring KiCad 
 
 ## Project status
 
-The local Python environment, FalkorDB Docker setup, two verified KiCad sample
-netlists, and the Python netlist parser are ready. Graph loading, diagnostic
-rules, the API, agent, and CircuitDoctor interface are not implemented yet.
+The Python parser, two verified KiCad samples, local parser API, and TypeScript
+circuit workspace are ready. Upload a netlist to explore its connections,
+components and pins. FalkorDB runs locally, but database loading, diagnostic
+rules and the AI agent are not connected yet.
+
+## Open the website
+
+The frontend uses TypeScript, Vite and Cytoscape. It needs Node.js 22.12+ (Node
+24 also works) and the Python environment described below.
+
+From the repository root, start the parser API in one terminal:
+
+```bash
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn circuitdoctor.api:app --host 127.0.0.1 --port 8000 --reload
+```
+
+In a second terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open **http://localhost:5173**. Frontend edits appear automatically. Stop each
+server with Ctrl+C when finished.
+
+- Upload a KiCad S-expression `.net`, or switch between the two examples.
+- Click graph nodes or table rows to inspect the actual exported pins.
+- Search components/nets, show unused pins, or view/copy parsed JSON.
+- Files are parsed in memory on this computer; uploads are not saved or sent
+  to an AI service. The graph is drawn from parser output, not FalkorDB yet.
+- A single-pin net is shown as an observation. The disabled **Run review**
+  button will become available when electrical checks are implemented.
+
+For a built preview, run `npm run build` in `frontend`, then start (or restart)
+the Python API. It also serves the built website at **http://localhost:8000**.
+
+Checks from the repository root:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -v
+npm --prefix frontend run build
+```
 
 ## Initial scope (planned)
 
@@ -57,7 +101,7 @@ docker compose exec -T falkordb redis-cli ping
 The last command should print `PONG`. The first startup downloads the image.
 
 Open **http://localhost:3000** for FalkorDB Browser. This is the database viewer;
-the CircuitDoctor application will be built separately. If asked for a database
+the CircuitDoctor website runs separately at port 5173. If asked for a database
 connection, use host `127.0.0.1`, port `6379`, and leave credentials empty.
 
 - Database address for local Python code: `127.0.0.1:6379`.
@@ -110,7 +154,6 @@ From the repository root, with the virtual environment activated:
 ```bash
 python -m circuitdoctor samples/clean.net
 python -m circuitdoctor samples/missing_ground.net --json
-python -m unittest discover -s tests -v
 ```
 
 Replace the sample path with your own KiCad S-expression `.net` file. The first
