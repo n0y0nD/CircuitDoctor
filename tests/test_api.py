@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from circuitdoctor.api import app
 from circuitdoctor.parser import load_netlist
+from circuitdoctor.storage import StorageUnavailable
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -49,12 +50,30 @@ class WorkspaceApiTests(unittest.TestCase):
         response = self.client.get("/api/samples/README.md")
         self.assertEqual(response.status_code, 404)
 
-    def test_status_does_not_claim_database_or_diagnosis_is_ready(self):
-        response = self.client.get("/api/status")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {
-            "parser": "ready", "graph_storage": "not_connected", "review": "not_implemented",
-        })
+    def test_status_reports_actual_database_availability_without_claiming_diagnosis(self):
+        for connected in (True, False):
+            with patch("circuitdoctor.api.get_store") as get_store:
+                get_store.return_value.available.return_value = connected
+                response = self.client.get("/api/status")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {
+                "parser": "ready", "graph_storage": "connected" if connected else "unavailable",
+                "review": "not_implemented",
+            })
+
+    def test_invalid_circuit_upload_never_reaches_storage(self):
+        with patch("circuitdoctor.api.get_store") as store:
+            response = self.client.post("/api/circuits", content=b"(export")
+        self.assertEqual(response.status_code, 400)
+        store.assert_not_called()
+
+    def test_database_failure_is_not_a_parser_only_success(self):
+        with patch("circuitdoctor.api.get_store", side_effect=StorageUnavailable("Database offline")):
+            status = self.client.get("/api/status")
+            response = self.client.post("/api/circuits", content=(ROOT / "samples/clean.net").read_bytes())
+        self.assertEqual(status.json()["graph_storage"], "unavailable")
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("components", response.json())
 
 
 if __name__ == "__main__":

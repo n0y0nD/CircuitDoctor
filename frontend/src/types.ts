@@ -19,6 +19,16 @@ export interface Net {
   nodes: PinNode[];
 }
 export interface Circuit {
+  storage: {
+    source: "falkordb";
+    circuit_id: string;
+    graph_name: string;
+    filename: string;
+    sample: string;
+    pins: number;
+    connections: number;
+    query: string;
+  };
   version: string;
   design: { source: string; date: string; tool: string };
   components: Component[];

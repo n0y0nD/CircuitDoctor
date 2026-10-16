@@ -3,22 +3,23 @@ Understand your circuit. Trace the problem. An AI assistant for exploring KiCad 
 
 ## Project status
 
-The Python parser, two verified KiCad samples, local parser API, and TypeScript
-circuit workspace are ready. Upload a netlist to explore its connections,
-components and pins. FalkorDB runs locally, but database loading, diagnostic
-rules and the AI agent are not connected yet.
+The parser, upload API, FalkorDB loader and TypeScript circuit workspace are
+connected. Uploaded circuits are stored as Component → Pin → Net graphs and
+read back through Cypher for the website. Diagnostic rules and the AI agent
+are not implemented yet.
 
 ## Open the website
 
 The frontend uses TypeScript, Vite and Cytoscape. It needs Node.js 22.12+ (Node
 24 also works) and the Python environment described below.
 
-From the repository root, start the parser API in one terminal:
+Start FalkorDB first (`docker compose up -d --wait`; use `sudo` if your Docker
+installation requires it). From the repository root, start the API in one terminal:
 
 ```bash
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m uvicorn circuitdoctor.api:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn circuitdoctor.api:app --host 127.0.0.1 --port 8000 --reload --reload-dir circuitdoctor
 ```
 
 In a second terminal:
@@ -32,13 +33,17 @@ npm run dev
 Open **http://localhost:5173**. Frontend edits appear automatically. Stop each
 server with Ctrl+C when finished.
 
-- Upload a KiCad S-expression `.net`, or switch between the two examples.
+- Upload your KiCad S-expression `.net` to open its circuit workspace.
 - Click graph nodes or table rows to inspect the actual exported pins.
 - Search components/nets, show unused pins, or view/copy parsed JSON.
-- Files are parsed in memory on this computer; uploads are not saved or sent
-  to an AI service. The graph is drawn from parser output, not FalkorDB yet.
-- A single-pin net is shown as an observation. The disabled **Run review**
-  button will become available when electrical checks are implemented.
+- Original file bytes are parsed in memory. Extracted connections and metadata
+  are saved in the local FalkorDB volume until explicitly deleted. They are not
+  sent to an AI service. Each upload gets its own random circuit ID and graph.
+- Expand **File details** to see the graph name and read query.
+  **Reload saved circuit**, or refresh the page, to reopen the same stored circuit.
+  No file re-upload is required; the circuit ID is kept in the URL fragment.
+- A single-pin net is shown as an observation, not an electrical diagnosis.
+  Electrical checks and AI explanations are still in development.
 
 For a built preview, run `npm run build` in `frontend`, then start (or restart)
 the Python API. It also serves the built website at **http://localhost:8000**.
@@ -117,8 +122,21 @@ List graphs from the terminal:
 docker compose exec -T falkordb redis-cli GRAPH.LIST
 ```
 
-The list starts empty; circuit data will be added in the sample/parser/loader
-steps.
+Uploaded circuits appear as `circuitdoctor_<id>`. Select the matching graph in
+FalkorDB Browser and run:
+
+```cypher
+MATCH (c:Component)-[:HAS_PIN]->(p:Pin)-[:ON_NET]->(n:Net)
+RETURN c, p, n
+```
+
+Uploads are isolated by graph, not authenticated user accounts. This is a
+loopback-only development app: anyone with local API access and a circuit ID
+can read it. It is not yet a public multi-user service.
+
+Database settings may be supplied as process environment variables:
+`FALKORDB_HOST`, `FALKORDB_PORT`, `FALKORDB_USERNAME`, `FALKORDB_PASSWORD`.
+Defaults connect to `127.0.0.1:6379` without credentials. `.env` is not auto-loaded.
 
 To stop and later start the service:
 
@@ -145,7 +163,8 @@ The clean path is D13 -> resistor -> LED -> GND. The faulty sample removes only
 the wire from the LED cathode to GND. Both were exported with KiCad and checked
 against the original circuit's connectivity.
 
-These files are not loaded into FalkorDB yet. Graph loading is the next step.
+These files are development test fixtures. The website has no example buttons
+and starts with a simple upload screen for the user’s own circuit.
 
 ## Read a netlist (Part 3)
 
@@ -184,3 +203,29 @@ exits with status 2 without printing a partial circuit.
 
 Format references: [KiCad netlist documentation](https://docs.kicad.org/9.0/en/eeschema/eeschema.html#netlist_formats)
 and the [sexpdata parser](https://github.com/jd-boyd/sexpdata).
+
+## Circuit storage API
+
+- `POST /api/circuits?filename=example.net`: bounded raw UTF-8 `.net` body; returns
+  a circuit ID after import completes.
+- `GET /api/circuits/{id}`: reconstructs components and connectivity from FalkorDB.
+- `POST /api/circuits/samples/{name}`: explicitly import an optional example.
+- `GET /api/status`: reports database availability; diagnostics remain unimplemented.
+- `/api/parse` and `/api/samples/{name}` remain parser-only inspection endpoints;
+  the website uses the stored-circuit endpoints above.
+
+Library pin definitions are preserved, including pins absent from exported nets.
+No connectivity is invented for those pins. Incomplete imports are not exposed;
+a failed import attempts to clean up only its newly generated graph. Database
+errors return 503 instead of silently falling back to parser output.
+
+Run the real database integration checks after starting FalkorDB:
+
+```bash
+CIRCUITDOCTOR_TEST_DB=1 python -m unittest discover -s tests -v
+```
+
+The checks cover generic Uno/Nano exports, unknown components, multiple pins on
+a net, upload isolation, database read-back and failed-import cleanup. They
+create and remove only their own temporary graphs. Without the environment
+flag, the real-database tests are skipped.

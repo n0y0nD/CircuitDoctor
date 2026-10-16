@@ -21,59 +21,60 @@ let selection: Selection | null = null;
 let graph: CircuitGraph | null = null;
 let view: View = "graph";
 let filename = "";
-let sampleName = "";
 let query = "";
 let showUnused = false;
 let requestId = 0;
 
 $("#app").innerHTML = `
-<aside class="sidebar" id="sidebar">
-  <a class="brand" href="/" aria-label="CircuitDoctor workspace"><img src="/favicon.svg" alt=""/><span>Circuit<span class="brand-light">Doctor</span></span></a>
-  <div class="workspace-label"><span class="workspace-avatar">N</span><div><strong>Local workspace</strong><span>Your circuit workbench</span></div><span class="local-dot"></span></div>
-  <p class="nav-label">WORKSPACE</p>
-  <nav aria-label="Workspace"><button class="nav-item active" id="workspace-nav">${icon("graph")} Circuit explorer <span class="nav-dot"></span></button></nav>
-  <div class="sample-heading"><p class="nav-label">EXAMPLE CIRCUITS</p><span>02</span></div>
-  <button class="sample-item" data-sample="clean">${icon("file", 18)}<span>Arduino LED blink<small>Complete wiring</small></span></button>
-  <button class="sample-item" data-sample="missing-ground">${icon("file", 18)}<span>Missing ground<small>One connection removed</small></span></button>
-  <div class="sidebar-note"><span class="note-icon">${icon("chip", 19)}</span><strong>A little clarity.<br>A better circuit.</strong><p>Explore how your components connect, one pin at a time.</p><button class="text-button help-trigger">How it works ${icon("arrow", 15)}</button></div>
-  <div class="sidebar-bottom"><button class="nav-item help-trigger">${icon("help", 18)} Help &amp; quick start</button><div class="sidebar-foot"><span class="brand-mini">CD</span><span>CircuitDoctor<span class="version">Local preview · v0.1</span></span><span class="foot-spark">✳</span></div></div>
-</aside>
-<div class="main-shell">
-  <header class="topbar"><button class="icon-button mobile-menu" id="menu-button" aria-label="Toggle navigation">${icon("menu")}</button><div class="breadcrumb"><span>Workspace</span>${icon("chevron", 14)}<strong>Circuit explorer</strong></div><div class="topbar-right"><span class="connection-status" id="connection-status"><i></i> Connecting to parser</span><span class="topbar-divider"></span><button class="icon-button help-trigger" aria-label="Open help">${icon("help", 19)}</button></div></header>
-  <main>
-    <div class="page-heading"><div><div class="eyebrow"><span></span> YOUR CIRCUIT, CONNECTED</div><h1>See the whole connection.</h1><p>Turn your KiCad netlist into a circuit you can explore.</p></div><button class="button primary upload-trigger">${icon("upload", 18)} Upload netlist</button></div>
-    <input id="file-input" type="file" accept=".net" hidden />
-    <section class="upload-zone" id="dropzone" aria-label="Upload a netlist"><div class="upload-symbol">${icon("upload", 23)}</div><div class="upload-copy"><strong>Drop your circuit here, <button class="inline-button upload-trigger">or browse files</button></strong><p>KiCad .net files <span>·</span> Up to 10 MiB <span>·</span> Processed on this computer</p></div><span class="file-type">.net</span></section>
-    <div id="notice" role="alert" hidden></div>
-    <section class="circuit-section" aria-label="Current circuit">
-      <div class="circuit-topline"><div class="circuit-name"><span class="document-icon">${icon("file", 18)}</span><h2 id="circuit-title">Your circuit workspace</h2><span class="badge" id="source-badge">No file loaded</span></div><span class="read-status" id="read-status"></span></div>
-      <div class="stats" id="stats"><div class="stat"><span>Components</span><strong>—</strong></div><div class="stat"><span>Nets</span><strong>—</strong></div><div class="stat"><span>Pin connections</span><strong>—</strong></div><div class="stat board-stat"><span>Board</span><strong>—</strong></div></div>
-      <div class="workbench">
-        <section class="explorer-panel" aria-label="Circuit explorer">
-          <div class="explorer-toolbar"><div class="view-tabs" role="tablist" aria-label="Circuit views">
-            <button data-view="graph" role="tab" aria-selected="true" class="active">${icon("graph", 17)} Graph</button>
-            <button data-view="components" role="tab" aria-selected="false">${icon("chip", 17)} Components</button>
-            <button data-view="nets" role="tab" aria-selected="false">${icon("net", 17)} Nets</button>
-            <button data-view="data" role="tab" aria-selected="false">${icon("code", 17)} Data</button>
-          </div><button id="copy-json" class="icon-button" aria-label="Copy parsed JSON" title="Copy parsed JSON" disabled>${icon("copy", 16)}</button></div>
-          <div class="explorer-subbar"><label class="search-field">${icon("search", 16)}<input id="search" placeholder="Find a component or net…" aria-label="Find a component or net"/></label><label class="toggle-label"><input type="checkbox" id="unused-toggle"/><span>Unused pins</span></label></div>
-          <div class="canvas-wrap"><div id="graph-view" class="graph-view" role="tabpanel" aria-label="Circuit graph. Use the Components and Nets tabs for keyboard-accessible details."></div><div id="list-view" class="list-view" role="tabpanel" hidden></div><div id="canvas-empty" class="canvas-empty"><span>${icon("graph", 36)}</span><h3>Every circuit tells a story.</h3><p>Upload a netlist or try an example to follow its connections.</p><button class="button secondary" data-sample="clean">Explore the LED example ${icon("arrow", 16)}</button></div><div id="loading-overlay" class="loading-overlay" hidden><span class="spinner"></span><span>Reading your circuit…</span></div><div class="graph-controls" id="graph-controls"><button class="icon-button" id="zoom-out" aria-label="Zoom out">${icon("minus", 16)}</button><span id="zoom-value">100%</span><button class="icon-button" id="zoom-in" aria-label="Zoom in">${icon("plus", 16)}</button><span class="control-divider"></span><button class="icon-button" id="fit-view" aria-label="Fit graph to screen" title="Fit graph">${icon("fit", 17)}</button></div><span class="canvas-hint" id="canvas-hint">Drag to move · Scroll to zoom</span></div>
-          <div class="graph-footer"><div class="legend"><span><i class="legend-component"></i> Component</span><span><i class="legend-net"></i> Net</span><span><i class="legend-single"></i> Single pin</span></div><span id="graph-summary">Waiting for a netlist</span></div>
-        </section>
-        <aside class="detail-column"><section class="inspector" aria-label="Selected item details"><div class="panel-heading"><h3>Inspector</h3><span class="eyebrow-tiny">CIRCUIT DETAILS</span></div><div id="inspector-body"><div class="inspector-empty">${icon("chip", 32)}<p>Select a component or net<br>to see its connections.</p></div></div></section><section class="review-card"><div class="review-heading"><span>${icon("heart", 19)} Electrical review</span><span class="planned-badge">Coming next</span></div><p>Explore connections now. Automated electrical checks will appear here when ready.</p><button class="button review-button" disabled>${icon("check", 17)} Run review</button></section></aside>
-      </div>
-      <div class="workspace-bottom"><span>${icon("net", 15)} Connections from your netlist. Not a PCB layout or simulation.</span><span class="scope-label">Built for the Arduino workbench</span></div>
-    </section>
-  </main>
-  <footer class="main-footer"><span>Make sense of your circuit.</span><span>Graph storage &amp; AI diagnosis are not connected yet.</span></footer>
-</div>
-<dialog id="help-dialog"><button class="icon-button dialog-close" id="close-help" aria-label="Close help">${icon("close")}</button><div class="dialog-symbol">${icon("graph", 28)}</div><p class="eyebrow">A QUICK WALKTHROUGH</p><h2>Your circuit, made readable.</h2><ol><li><strong>Bring a netlist.</strong><p>In KiCad, export the schematic as a KiCad .net file. Upload it here, or select an example from the sidebar.</p></li><li><strong>Follow the connections.</strong><p>Click a component or net to inspect its pins. Switch to Components or Nets for a searchable list. Unused pins are hidden from the graph by default.</p></li><li><strong>See exactly what is known.</strong><p>This preview reads real connectivity. It does not diagnose electrical faults yet. Initial diagnosis targets are Uno R3 and classic Nano (ATmega328P).</p></li></ol><button class="button primary" id="got-it">Got it ${icon("arrow", 16)}</button></dialog>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="CircuitDoctor home"><img src="/favicon.svg" alt=""/>CircuitDoctor</a>
+  <div class="header-actions"><span class="connection-status" id="connection-status" role="status"><i></i> Connecting…</span><button class="button secondary upload-trigger" id="replace-file" hidden>${icon("upload", 16)} Upload another</button><button class="icon-button help-trigger" aria-label="How to export a netlist" title="How to export a netlist">${icon("help")}</button></div>
+</header>
+<main>
+  <input id="file-input" type="file" accept=".net" hidden />
+  <div id="notice" role="alert" hidden></div>
+  <section class="welcome" id="welcome" aria-labelledby="welcome-title">
+    <p class="supported-boards">ARDUINO UNO R3 <span>·</span> CLASSIC NANO</p>
+    <h1 id="welcome-title">Understand your circuit.</h1>
+    <p class="welcome-description">Bring your KiCad netlist. See what’s connected,<br class="desktop-break"/> and follow every pin.</p>
+    <div class="upload-zone" id="dropzone">
+      <span class="upload-symbol">${icon("upload", 28)}</span>
+      <button class="button primary upload-trigger">Upload .net file ${icon("arrow", 17)}</button>
+      <p class="drop-hint">or drag your file here</p>
+      <span class="file-note">KiCad netlist · Up to 10 MiB</span>
+    </div>
+    <button class="text-button help-trigger">Where do I get a .net file? ${icon("chevron", 14)}</button>
+    <p class="scope-note">Explore connections now. Electrical checks and AI explanations are still in development.</p>
+  </section>
+  <div id="loading-overlay" class="loading-overlay" role="status" hidden><span class="spinner"></span> Reading your circuit…</div>
+  <section class="circuit-section" id="circuit-section" aria-label="Your uploaded circuit" hidden>
+    <div class="circuit-topline"><div class="circuit-title-group"><span class="file-icon">${icon("file", 23)}</span><div><h1 id="circuit-title"></h1><p id="circuit-summary"></p></div></div><button class="icon-button" id="clear-circuit" aria-label="Close circuit and return to upload" title="Close circuit">${icon("close", 19)}</button></div>
+    <div class="workbench">
+      <section class="explorer-panel" aria-label="Circuit explorer">
+        <div class="explorer-toolbar"><div class="view-tabs" role="tablist" aria-label="Circuit views">
+          <button data-view="graph" role="tab" aria-selected="true" class="active">Circuit</button>
+          <button data-view="components" role="tab" aria-selected="false">Components</button>
+          <button data-view="nets" role="tab" aria-selected="false">Connections</button>
+        </div><button class="icon-button" id="expand-canvas" aria-label="Expand workspace" title="Expand workspace">${icon("fit", 18)}</button></div>
+        <div class="explorer-subbar"><label class="search-field">${icon("search", 16)}<input id="search" placeholder="Find a component or net" aria-label="Find a component or net"/></label><label class="toggle-label"><input type="checkbox" id="unused-toggle"/><span>Show unused pins</span></label></div>
+        <div class="canvas-wrap"><div id="graph-view" class="graph-view" role="tabpanel" aria-label="Circuit graph. Use Components and Connections for keyboard-accessible details."></div><div id="list-view" class="list-view" role="tabpanel" hidden></div><div id="canvas-empty" class="canvas-empty" hidden><h2>No components in this file</h2><p>Upload a netlist with components and connections to explore.</p></div><div class="graph-controls" id="graph-controls"><button class="icon-button" id="zoom-out" aria-label="Zoom out">${icon("minus", 16)}</button><span id="zoom-value">100%</span><button class="icon-button" id="zoom-in" aria-label="Zoom in">${icon("plus", 16)}</button><button class="icon-button" id="fit-view" aria-label="Fit graph to screen">${icon("fit", 17)}</button><button class="reset-layout" id="reset-layout" title="Restore automatic placement">Reset layout</button></div><span class="canvas-hint" id="canvas-hint">Drag parts / ○ wire bends · Double-click part to zoom</span></div>
+        <div class="graph-footer"><div class="legend"><span><i class="legend-component"></i> Component</span><span><i class="legend-net"></i> Wire junction</span><span><i class="legend-single"></i> Single pin</span></div><span id="graph-summary"></span></div>
+      </section>
+      <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="inspector-body"></div></aside>
+    </div>
+    <p class="scope-note">Gold sockets are connected pins. Drag the open circles to route wires. Board labels form an enlarged pin map, not a physical wiring template.</p>
+    <details id="storage-details" class="file-details"><summary>File details</summary><p id="read-status"></p><p id="storage-info"></p><div class="file-actions"><button class="button secondary" id="reload-circuit">Reload saved circuit</button><button class="button secondary" data-view="data">View JSON</button><button class="button secondary" id="copy-json">Copy JSON</button></div><pre class="json-view" id="storage-query"></pre></details>
+  </section>
+</main>
+<footer>Connections from your file. No circuit simulation.</footer>
+<div class="drop-overlay" id="drop-overlay" hidden>${icon("upload", 32)}<strong>Drop your .net file</strong></div>
+<dialog id="help-dialog" aria-labelledby="help-title"><button class="icon-button dialog-close" id="close-help" aria-label="Close help">${icon("close")}</button><h2 id="help-title">Export your circuit from KiCad</h2><ol><li>Open your circuit in the schematic editor.</li><li>Select <strong>File → Export → Netlist</strong>.</li><li>Choose the <strong>KiCad</strong> format and save the <strong>.net</strong> file.</li><li>Upload that file here to explore its connections.</li></ol><p>Uploads are stored in your local database. Images, PCB files and schematics cannot be uploaded directly.</p><button class="button primary" id="got-it">Got it</button></dialog>
 <div id="toast" class="toast" role="status" hidden></div>`;
 
 function connectionState(online: boolean) {
   const element = $("#connection-status");
   element.classList.toggle("offline", !online);
-  element.innerHTML = `<i></i> ${online ? "Parser connected" : "Parser unavailable"}`;
+  element.innerHTML = `<i></i> ${online ? "Ready" : "Service unavailable"}`;
 }
 function notice(message = "") {
   $("#notice").textContent = message;
@@ -92,32 +93,35 @@ function setBusy(value: boolean) {
   $("#loading-overlay").hidden = !value;
   $("#dropzone").classList.toggle("loading", value);
   $("#read-status").innerHTML = value
-    ? '<span class="spinner small"></span> Reading netlist'
+    ? '<span class="spinner small"></span> Saving and loading circuit'
     : circuit
-      ? `${icon("check", 14)} Netlist parsed`
+      ? `${icon("check", 14)} Loaded from FalkorDB`
       : "";
-  document.querySelectorAll<HTMLButtonElement>("[data-sample]").forEach((b) => {
+  document.querySelectorAll<HTMLButtonElement>(".upload-trigger, #reload-circuit").forEach((b) => {
     b.disabled = value;
   });
 }
 async function readCircuit(
   url: string,
   name: string,
-  example = "",
   options: RequestInit = {},
 ) {
   const currentRequest = ++requestId;
   setBusy(true);
   notice();
   try {
-    const response = await fetch(url, options);
+    let response = await fetch(url, options);
+    if (response.ok && options.method === "POST") {
+      const receipt = (await response.json()) as { circuit_id: string };
+      response = await fetch(`/api/circuits/${encodeURIComponent(receipt.circuit_id)}`);
+    }
     if (!response.ok) {
       if (response.status >= 500 && currentRequest === requestId)
         connectionState(false);
       const error = await response
         .json()
         .catch(() => ({
-          detail: "The local parser is unavailable. Start it and try again.",
+          detail: "The local API or FalkorDB is unavailable. Start the services and try again.",
         }));
       throw new Error(
         typeof error.detail === "string"
@@ -127,9 +131,15 @@ async function readCircuit(
     }
     const result = (await response.json()) as Circuit;
     if (currentRequest !== requestId) return;
+    if (result.storage?.source !== "falkordb") {
+      throw new Error("The server did not return a stored circuit.");
+    }
     circuit = result;
-    filename = name;
-    sampleName = example;
+    filename = result.storage.filename || name;
+    history.replaceState(null, "", `#circuit=${result.storage.circuit_id}`);
+    view = "graph";
+    showUnused = false;
+    $<HTMLInputElement>("#unused-toggle").checked = false;
     query = "";
     $<HTMLInputElement>("#search").value = "";
     const first =
@@ -150,14 +160,6 @@ async function readCircuit(
     if (currentRequest === requestId) setBusy(false);
   }
 }
-function loadSample(name: string) {
-  document.body.classList.remove("nav-open");
-  void readCircuit(
-    `/api/samples/${name}`,
-    name === "clean" ? "clean.net" : "missing_ground.net",
-    name,
-  );
-}
 async function upload(file: File | undefined) {
   if (!file) return;
   if (!file.name.toLowerCase().endsWith(".net")) {
@@ -170,7 +172,7 @@ async function upload(file: File | undefined) {
     notice("This file is larger than 10 MiB. Choose a smaller netlist.");
     return;
   }
-  await readCircuit("/api/parse", file.name, "", {
+  await readCircuit(`/api/circuits?filename=${encodeURIComponent(file.name)}`, file.name, {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },
     body: file,
@@ -178,26 +180,19 @@ async function upload(file: File | undefined) {
 }
 function renderCircuit() {
   if (!circuit) return;
-  const components = circuit.components;
-  const unused = circuit.nets.filter(isUnused).length;
-  const pinCount = circuit.nets.reduce(
-    (total, net) => total + net.nodes.length,
-    0,
-  );
-  const boards = components.filter((c) => componentKind(c) === "board");
+  $("#welcome").hidden = true;
+  $("#circuit-section").hidden = false;
+  $("#replace-file").hidden = false;
+  $("#storage-info").textContent = `Saved in FalkorDB · ${circuit.storage.graph_name}`;
+  $("#storage-query").textContent = circuit.storage.query;
+  const boards = circuit.components.filter((c) => componentKind(c) === "board");
+  const board = boards.length === 1
+    ? (boards[0].libsource.part || boards[0].value) === "Arduino_UNO_R3" ? "Arduino Uno R3" : "Classic Nano"
+    : boards.length > 1 ? `${boards.length} Arduino boards` : "Board not identified";
   $("#circuit-title").textContent = filename;
-  $("#source-badge").textContent = sampleName
-    ? "Example circuit"
-    : "Uploaded netlist";
-  $("#stats").innerHTML =
-    `<div class="stat"><span>${icon("chip", 15)} Components</span><strong>${components.length}<small>parts in your circuit</small></strong></div><div class="stat"><span>${icon("net", 15)} Nets</span><strong>${circuit.nets.length}<small>${circuit.nets.length - unused} shown by default · ${unused} unused</small></strong></div><div class="stat"><span>${icon("graph", 15)} Pin connections</span><strong>${pinCount}<small>exported pin memberships</small></strong></div><div class="stat board-stat"><span>${icon("box", 15)} Board</span><strong>${boards.length === 1 ? esc((boards[0].libsource.part || boards[0].value) === "Arduino_UNO_R3" ? "Arduino Uno R3" : "Classic Nano") : boards.length > 1 ? `${boards.length} Arduino boards` : "Not identified"}<small>${boards.length ? "From the exported symbol" : "Components are still available to explore"}</small></strong></div>`;
-  document
-    .querySelectorAll<HTMLElement>(".sample-item")
-    .forEach((b) =>
-      b.classList.toggle("selected", b.dataset.sample === sampleName),
-    );
+  $("#circuit-summary").textContent = `${board} · ${circuit.components.length} components · ${circuit.nets.length} nets`;
   $("#copy-json").removeAttribute("disabled");
-  $("#canvas-empty").hidden = components.length > 0 || circuit.nets.length > 0;
+  $("#canvas-empty").hidden = circuit.components.length > 0 || circuit.nets.length > 0;
   renderView();
   renderInspector();
 }
@@ -298,9 +293,7 @@ function renderInspector() {
 
 document.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
-  const sample = target.closest<HTMLButtonElement>("[data-sample]");
-  if (sample && !sample.disabled) loadSample(sample.dataset.sample!);
-  if (target.closest(".upload-trigger")) $("#file-input").click();
+  if (target.closest(".upload-trigger:not(:disabled)")) $("#file-input").click();
   if (target.closest(".help-trigger"))
     $<HTMLDialogElement>("#help-dialog").showModal();
   if (target.closest("#close-help, #got-it"))
@@ -320,31 +313,31 @@ $("#file-input").addEventListener("change", (event) => {
   void upload(input.files?.[0]);
   input.value = "";
 });
-const dropzone = $("#dropzone");
+const dropOverlay = $("#drop-overlay");
 let dragDepth = 0;
-dropzone.addEventListener("dragenter", (event) => {
+const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
+document.addEventListener("dragenter", (event) => {
+  if (!hasFiles(event)) return;
   event.preventDefault();
   dragDepth++;
-  dropzone.classList.add("dragover");
+  dropOverlay.hidden = false;
 });
-dropzone.addEventListener("dragover", (event) => {
-  event.preventDefault();
+document.addEventListener("dragover", (event) => event.preventDefault());
+document.addEventListener("dragleave", () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) dropOverlay.hidden = true;
 });
-dropzone.addEventListener("dragleave", () => {
-  if (--dragDepth <= 0) dropzone.classList.remove("dragover");
-});
-dropzone.addEventListener("drop", (event) => {
+document.addEventListener("drop", (event) => {
   event.preventDefault();
   dragDepth = 0;
-  dropzone.classList.remove("dragover");
+  dropOverlay.hidden = true;
+  if (!hasFiles(event)) return;
   if (event.dataTransfer?.files.length !== 1) {
     notice("Drop one netlist at a time.");
     return;
   }
   void upload(event.dataTransfer.files[0]);
 });
-document.addEventListener("dragover", (event) => event.preventDefault());
-document.addEventListener("drop", (event) => event.preventDefault());
 $<HTMLInputElement>("#search").addEventListener("input", (event) => {
   query = (event.target as HTMLInputElement).value;
   graph?.search(query);
@@ -357,26 +350,54 @@ $("#unused-toggle").addEventListener("change", (event) => {
 $("#zoom-in").onclick = () => graph?.zoomBy(1.2);
 $("#zoom-out").onclick = () => graph?.zoomBy(1 / 1.2);
 $("#fit-view").onclick = () => graph?.fit();
-$("#workspace-nav").onclick = () => {
-  view = "graph";
-  renderView();
-  document.body.classList.remove("nav-open");
+$("#reset-layout").onclick = () => graph?.resetLayout();
+function setExpanded(expanded: boolean) {
+  $(".explorer-panel").classList.toggle("expanded", expanded);
+  document.body.classList.toggle("canvas-expanded", expanded);
+  $("#expand-canvas").setAttribute("aria-label", expanded ? "Close expanded workspace" : "Expand workspace");
+  $("#expand-canvas").title = expanded ? "Close expanded workspace (Esc)" : "Expand workspace";
+  $("#expand-canvas").innerHTML = icon(expanded ? "close" : "fit", 18);
+}
+$("#expand-canvas").onclick = () => setExpanded(!$(".explorer-panel").classList.contains("expanded"));
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") setExpanded(false);
+});
+$("#clear-circuit").onclick = () => {
+  setExpanded(false);
+  requestId++; // Discard any pending response without deleting stored data.
+  graph?.destroy();
+  graph = null;
+  circuit = null;
+  selection = null;
+  history.replaceState(null, "", location.pathname + location.search);
+  $("#welcome").hidden = false;
+  $("#circuit-section").hidden = true;
+  $("#replace-file").hidden = true;
+  $<HTMLDetailsElement>("#storage-details").open = false;
+  notice();
+  setBusy(false);
+  $(".welcome .upload-trigger").focus();
 };
-$("#menu-button").onclick = () => document.body.classList.toggle("nav-open");
 $("#copy-json").onclick = async () => {
   if (!circuit) return;
   try {
     await navigator.clipboard.writeText(JSON.stringify(circuit, null, 2));
     toast("Parsed circuit copied as JSON.");
   } catch {
-    toast("Clipboard unavailable. You can select and copy from the Data tab.");
+    toast("Clipboard unavailable. You can select and copy from the JSON view.");
   }
 };
 $<HTMLDialogElement>("#help-dialog").addEventListener("click", (event) => {
   if (event.target === $<HTMLDialogElement>("#help-dialog"))
     $<HTMLDialogElement>("#help-dialog").close();
 });
+$("#reload-circuit").onclick = () => {
+  if (circuit) void readCircuit(`/api/circuits/${circuit.storage.circuit_id}`, filename);
+};
 fetch("/api/status")
-  .then((response) => connectionState(response.ok))
+  .then(async (response) => connectionState(response.ok && (await response.json()).graph_storage === "connected"))
   .catch(() => connectionState(false));
-loadSample("clean");
+const savedId = new URLSearchParams(location.hash.slice(1)).get("circuit");
+if (savedId && /^[0-9a-f]{32}$/.test(savedId)) {
+  void readCircuit(`/api/circuits/${savedId}`, "Stored circuit");
+}
