@@ -2,6 +2,7 @@ import "@fontsource-variable/inter";
 import "./style.css";
 import { icon } from "./icons";
 import { CircuitGraph } from "./graph";
+import { ExplanationRequest, type ExplanationState } from "./explanation";
 import {
   componentKind,
   displayValue,
@@ -24,6 +25,14 @@ let filename = "";
 let query = "";
 let showUnused = false;
 let requestId = 0;
+const explanationRequest = new ExplanationRequest();
+let explanation: ExplanationState = { status: "idle" };
+
+function clearExplanation() {
+  explanationRequest.cancel();
+  explanation = { status: "idle" };
+  graph?.highlightEvidence(null);
+}
 
 $("#app").innerHTML = `
 <header class="topbar">
@@ -60,7 +69,7 @@ $("#app").innerHTML = `
         <div class="canvas-wrap"><div id="graph-view" class="graph-view" role="tabpanel" aria-label="Circuit graph. Use Components and Connections for keyboard-accessible details."></div><div id="list-view" class="list-view" role="tabpanel" hidden></div><div id="canvas-empty" class="canvas-empty" hidden><h2>No components in this file</h2><p>Upload a netlist with components and connections to explore.</p></div><div class="graph-controls" id="graph-controls"><button class="icon-button" id="zoom-out" aria-label="Zoom out">${icon("minus", 16)}</button><span id="zoom-value">100%</span><button class="icon-button" id="zoom-in" aria-label="Zoom in">${icon("plus", 16)}</button><button class="icon-button" id="fit-view" aria-label="Fit graph to screen">${icon("fit", 17)}</button><button class="reset-layout" id="reset-layout" title="Restore automatic placement">Reset layout</button></div><span class="canvas-hint" id="canvas-hint">Drag parts / ○ wire bends · Double-click part to zoom</span></div>
         <div class="graph-footer"><div class="legend"><span><i class="legend-component"></i> Component</span><span><i class="legend-net"></i> Wire junction</span><span><i class="legend-single"></i> Single pin</span></div><span id="graph-summary"></span></div>
       </section>
-      <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="inspector-body"></div></aside>
+      <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="inspector-body"></div><section id="explanation-panel" class="explanation-panel" aria-label="Connection explanation" hidden></section></aside>
     </div>
     <p class="scope-note">Gold sockets are connected pins. Drag the open circles to route wires. Board labels form an enlarged pin map, not a physical wiring template.</p>
     <details id="storage-details" class="file-details"><summary>File details</summary><p id="read-status"></p><p id="storage-info"></p><div class="file-actions"><button class="button secondary" id="reload-circuit">Reload saved circuit</button><button class="button secondary" data-view="data">View JSON</button><button class="button secondary" id="copy-json">Copy JSON</button></div><pre class="json-view" id="storage-query"></pre></details>
@@ -106,6 +115,8 @@ async function readCircuit(
   name: string,
   options: RequestInit = {},
 ) {
+  clearExplanation();
+  renderExplanation();
   const currentRequest = ++requestId;
   setBusy(true);
   notice();
@@ -134,6 +145,7 @@ async function readCircuit(
     if (result.storage?.source !== "falkordb") {
       throw new Error("The server did not return a stored circuit.");
     }
+    clearExplanation();
     circuit = result;
     filename = result.storage.filename || name;
     history.replaceState(null, "", `#circuit=${result.storage.circuit_id}`);
@@ -197,6 +209,7 @@ function renderCircuit() {
   renderInspector();
 }
 function selectItem(value: Selection) {
+  clearExplanation();
   selection = value;
   graph?.select(selection);
   renderInspector();
@@ -235,6 +248,7 @@ function renderView() {
     );
     graph.select(selection);
     graph.search(query);
+    graph.highlightEvidence(explanation.status === "success" ? explanation.result : null);
   } else renderList();
   const shown = circuit.nets.filter((n) => showUnused || !isUnused(n)).length;
   $("#graph-summary").textContent =
@@ -265,12 +279,18 @@ function renderList() {
   }
 }
 function renderInspector() {
+  renderExplanation();
   if (!circuit || !selection) {
     $("#inspector-body").innerHTML =
       '<div class="inspector-empty">Select a component or net to inspect it.</div>';
     return;
   }
-  if (selection.kind === "component") {
+  if (selection.kind === "pin") {
+    const selected = selection;
+    const member = circuit.nets.flatMap(net => net.nodes).find(p => p.ref === selected.ref && p.pin === selected.pin);
+    const nets = circuit.nets.filter(net => net.nodes.some(p => p.ref === selected.ref && p.pin === selected.pin));
+    $("#inspector-body").innerHTML = `<div class="component-heading"><span class="component-symbol">${icon("chip", 25)}</span><div><span class="component-ref">${esc(selected.ref)} · PIN ${esc(selected.pin)}</span><h4>${esc(member ? pinName(circuit, member) : `Pin ${selected.pin}`)}</h4></div></div><p class="inspector-description">Follow this pin’s connections in your uploaded circuit.</p><div class="pin-list">${nets.map(net => `<button class="pin-row" data-net="${esc(net.code)}">${icon("net", 16)}<span><strong>${esc(netLabel(net))}</strong><small>View this net</small></span>${icon("chevron", 13)}</button>`).join("")}<button class="text-button" data-component="${esc(selected.ref)}">Back to ${esc(selected.ref)}</button></div>`;
+  } else if (selection.kind === "component") {
     const comp = circuit.components.find((c) => c.ref === selection!.id);
     if (!comp) return;
     const connections = circuit.nets.flatMap((net) =>
@@ -282,13 +302,30 @@ function renderInspector() {
     );
     const kind = componentKind(comp);
     $("#inspector-body").innerHTML =
-      `<div class="component-heading"><span class="component-symbol ${kind}">${icon(kind === "board" || kind === "component" ? "chip" : kind, 26)}</span><div><span class="component-ref">${esc(comp.ref)}</span><h4>${esc(displayValue(comp))}</h4></div></div><dl class="component-facts"><div><dt>Symbol library</dt><dd>${esc(comp.libsource.lib || "Unknown")}</dd></div><div><dt>Exported pins</dt><dd>${library?.pins.length ?? connections.length}</dd></div><div><dt>Pins shown</dt><dd>${active.length}</dd></div></dl><div class="connections-heading">CONNECTIONS <span>${active.length}</span></div><div class="pin-list">${active.map(({ net, pin }) => `<button class="pin-row" data-net="${esc(net.code)}"><span class="pin-square">${esc(pin.pin)}</span><span><strong>${esc(pinName(circuit!, pin))}</strong><small>${esc(netLabel(net))}</small></span>${icon("chevron", 13)}</button>`).join("") || '<p class="inspector-description">No pins are shown. Exported unused pins are hidden here.</p>'}</div>${connections.length > active.length ? `<div class="unused-note">${icon("help", 14)} ${connections.length - active.length} pins marked unused in the file.</div>` : ""}`;
+      `<div class="component-heading"><span class="component-symbol ${kind}">${icon(kind === "board" || kind === "component" ? "chip" : kind, 26)}</span><div><span class="component-ref">${esc(comp.ref)}</span><h4>${esc(displayValue(comp))}</h4></div></div><dl class="component-facts"><div><dt>Symbol library</dt><dd>${esc(comp.libsource.lib || "Unknown")}</dd></div><div><dt>Exported pins</dt><dd>${library?.pins.length ?? connections.length}</dd></div><div><dt>Pins shown</dt><dd>${active.length}</dd></div></dl><div class="connections-heading">CONNECTIONS <span>${active.length}</span></div><div class="pin-list">${active.map(({ net, pin }) => `<button class="pin-row" data-pin-ref="${esc(pin.ref)}" data-pin="${esc(pin.pin)}"><span class="pin-square">${esc(pin.pin)}</span><span><strong>${esc(pinName(circuit!, pin))}</strong><small>${esc(netLabel(net))}</small></span>${icon("chevron", 13)}</button>`).join("") || '<p class="inspector-description">No pins are shown. Exported unused pins are hidden here.</p>'}</div>${connections.length > active.length ? `<div class="unused-note">${icon("help", 14)} ${connections.length - active.length} pins marked unused in the file.</div>` : ""}`;
   } else {
     const net = circuit.nets.find((n) => n.code === selection!.id);
     if (!net) return;
     $("#inspector-body").innerHTML =
-      `<div class="component-heading"><span class="component-symbol net-symbol">${icon("net", 25)}</span><div><span class="component-ref">NET ${esc(net.code)}</span><h4>${esc(netLabel(net))}</h4></div></div><p class="net-full-name">${esc(net.name)}</p><dl class="component-facts"><div><dt>Pin memberships</dt><dd>${net.nodes.length}</dd></div><div><dt>Components</dt><dd>${new Set(net.nodes.map((p) => p.ref)).size}</dd></div></dl>${net.nodes.length === 1 ? `<p class="single-pin-note">${isUnused(net) ? "This pin is marked intentionally unused in the netlist." : "This net contains one pin. This is a connectivity observation, not a diagnosis."}</p>` : ""}<div class="connections-heading">ON THIS NET <span>${net.nodes.length}</span></div><div class="pin-list">${net.nodes.map((pin) => `<button class="pin-row" data-component="${esc(pin.ref)}"><span class="pin-square">${esc(pin.pin)}</span><span><strong>${esc(pin.ref)} · ${esc(pinName(circuit!, pin))}</strong><small>${esc(pin.pintype)}</small></span>${icon("chevron", 13)}</button>`).join("")}</div>`;
+      `<div class="component-heading"><span class="component-symbol net-symbol">${icon("net", 25)}</span><div><span class="component-ref">NET ${esc(net.code)}</span><h4>${esc(netLabel(net))}</h4></div></div><p class="net-full-name">${esc(net.name)}</p><dl class="component-facts"><div><dt>Pin memberships</dt><dd>${net.nodes.length}</dd></div><div><dt>Components</dt><dd>${new Set(net.nodes.map((p) => p.ref)).size}</dd></div></dl>${net.nodes.length === 1 ? `<p class="single-pin-note">${isUnused(net) ? "This pin is marked intentionally unused in the netlist." : "This net contains one pin. This is a connectivity observation, not a diagnosis."}</p>` : ""}<div class="connections-heading">ON THIS NET <span>${net.nodes.length}</span></div><div class="pin-list">${net.nodes.map((pin) => `<button class="pin-row" data-pin-ref="${esc(pin.ref)}" data-pin="${esc(pin.pin)}"><span class="pin-square">${esc(pin.pin)}</span><span><strong>${esc(pin.ref)} · ${esc(pinName(circuit!, pin))}</strong><small>${esc(pin.pintype)}</small></span>${icon("chevron", 13)}</button>`).join("")}</div>`;
   }
+}
+
+function renderExplanation() {
+  const panel = $("#explanation-panel");
+  panel.hidden = !circuit || !selection || selection.kind === "component";
+  if (panel.hidden) return;
+  const loading = explanation.status === "loading";
+  panel.innerHTML = `<button id="explain-connection" class="button primary" ${loading ? 'disabled' : ''}>${loading ? '<span class="spinner small"></span> Reading connections…' : explanation.status === "error" ? "Try again" : "Explain connection"}</button><div id="explanation-result" aria-live="polite" aria-atomic="true">${explanation.status === "success" ? `<p class="evidence-source">${icon("check", 14)} From your saved circuit</p><p class="explanation-summary">${esc(explanation.result.summary)}</p><p class="explanation-hint">Matching pins and wires are highlighted in the Circuit view.</p><p class="explanation-limit">Connectivity only · This does not confirm whether the circuit works.</p>` : explanation.status === "error" ? `<p class="explanation-error" role="alert">${esc(explanation.message)}</p>` : '<p class="explanation-hint">See what’s connected, using the saved circuit’s actual connections.</p>'}</div>`;
+}
+async function explainSelection() {
+  if (!circuit || !selection || selection.kind === "component") return;
+  graph?.highlightEvidence(null);
+  await explanationRequest.run(circuit.storage.circuit_id, selection, state => {
+    explanation = state;
+    renderExplanation();
+    graph?.highlightEvidence(state.status === "success" ? state.result : null);
+  });
 }
 
 document.addEventListener("click", (event) => {
@@ -303,6 +340,9 @@ document.addEventListener("click", (event) => {
     view = tab.dataset.view as View;
     renderView();
   }
+  if (target.closest("#explain-connection:not(:disabled)")) void explainSelection();
+  const pin = target.closest<HTMLElement>("[data-pin-ref]");
+  if (pin) selectItem({ kind: "pin", id: `p:${JSON.stringify([pin.dataset.pinRef!, pin.dataset.pin!])}`, ref: pin.dataset.pinRef!, pin: pin.dataset.pin! });
   const comp = target.closest<HTMLElement>("[data-component]");
   if (comp) selectItem({ kind: "component", id: comp.dataset.component! });
   const net = target.closest<HTMLElement>("[data-net]");
@@ -364,6 +404,7 @@ document.addEventListener("keydown", event => {
 });
 $("#clear-circuit").onclick = () => {
   setExpanded(false);
+  clearExplanation();
   requestId++; // Discard any pending response without deleting stored data.
   graph?.destroy();
   graph = null;

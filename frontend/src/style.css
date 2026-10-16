@@ -199,3 +199,17 @@ dialog p { font-size: 12px; line-height: 1.7; color: var(--muted); }
   .canvas-wrap { height: 440px; }
   .canvas-hint { display: block; font-size: 9px; left: 8px; right: 8px; text-align: center; }
 }
+
+.explanation-panel { padding: 18px; border-top: 1px solid var(--line); background: #f7fbf8; }
+.explanation-panel > .button { width: 100%; justify-content: center; }
+.explanation-panel p { overflow-wrap: anywhere; }
+.evidence-source { display: flex; align-items: center; gap: 6px; color: #16836b; font-size: 11px; margin: 18px 0 10px; }
+.explanation-summary { font-size: 13px; line-height: 1.8; color: #284c3d; }
+.explanation-hint, .explanation-limit { font-size: 11px; line-height: 1.7; color: var(--muted); margin: 12px 0 0; }
+.explanation-limit { border-top: 1px solid var(--line); padding-top: 12px; }
+.explanation-error { color: #9b482b; font-size: 12px; line-height: 1.7; }
+/* Keep explanations available while exploring the expanded canvas. */
+@media (min-width: 801px) {
+  .explorer-panel.expanded { right: 330px; }
+  .explorer-panel.expanded + .inspector { position: fixed; z-index: 51; right: 12px; top: 12px; bottom: 12px; width: 306px; overflow-y: auto; }
+}

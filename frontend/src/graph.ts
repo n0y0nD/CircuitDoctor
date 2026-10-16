@@ -2,6 +2,7 @@ import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
 import { componentKind, displayValue, isUnused, netLabel, pinName, type Circuit, type Selection } from './types';
 import { circuitArt } from './circuit-art';
 import { boardDrawing } from './board-art';
+import { evidenceMemberships, type Explanation } from './explanation';
 
 const colors = ['#168673', '#517caf', '#ac7c36', '#8e6eb0', '#458c98', '#ad6676'];
 type Point = { x: number; y: number };
@@ -78,14 +79,14 @@ export class CircuitGraph {
         ports.set(id,{x,y});
         portSides.set(id,(socket?.side || side)==='left' ? -1 : 1);
         const name = pinName(circuit,pin);
-        elements.push({data:{id,kind:'pin',ref:pin.ref,code:net.code,
+        elements.push({data:{id,kind:'pin',ref:pin.ref,pin:pin.pin,code:net.code,
           label:board?'':name===`Pin ${pin.pin}`?name:`${pin.pin} · ${name}`,board:board?'yes':'no',
           search:`${pin.ref} ${pin.pin} ${name}`.toLowerCase()},position:{x,y}});
         if (board) return; // The wire starts on the illustrated socket itself.
         // Short leads attach each exported pin to its own component. They are not electrical shorts.
         const anchor = `a:${id}`;
         elements.push({data:{id:anchor,kind:'anchor',ref:pin.ref,search:''},position:{x:pos.x+(side==='left'?-1:1)*pos.width/2,y}});
-        elements.push({data:{id:`lead:${id}`,source:anchor,target:id,kind:'lead',ref:pin.ref,color:'#8b9b9d'}});
+        elements.push({data:{id:`lead:${id}`,source:anchor,target:id,kind:'lead',ref:pin.ref,pinId:id,color:'#8b9b9d'}});
       });
     }
     const bottom = Math.max(0,...Array.from(positions.values()).map(p=>p.y+p.height/2))+85;
@@ -107,7 +108,7 @@ export class CircuitGraph {
         elements.push({data:{id:exit,kind:'anchor',ref:pin.ref,code:net.code,search:''},position:{x:outside,y:point.y}});
         elements.push({data:{id:bend,kind:'bend',ref:pin.ref,code:net.code,color,search:net.name.toLowerCase()},position:{x:outside,y}});
         [[source,exit],[exit,bend],[bend,`n:${net.code}`]].forEach(([from,to],segment)=>elements.push({
-          data:{id:`e:${key}:${segment}`,source:from,target:to,kind:'wire',code:net.code,ref:pin.ref,color}}));
+          data:{id:`e:${key}:${segment}`,source:from,target:to,kind:'wire',code:net.code,ref:pin.ref,pinId:source,color}}));
       });
     });
     this.cy = cytoscape({container,elements,layout:{name:'preset'},minZoom:0.06,maxZoom:3,
@@ -132,6 +133,9 @@ export class CircuitGraph {
         {selector:'.active',style:{'border-width':2,'border-color':'#16836b'}},
         {selector:'edge.connected',style:{width:4,'z-index':5}},
         {selector:'.muted',style:{opacity:0.18}},
+        {selector:'.evidence-muted',style:{opacity:0.16}},
+        {selector:'node.evidence',style:{'border-width':3,'border-color':'#13856e',opacity:1}},
+        {selector:'edge.evidence',style:{width:4,'line-color':'#13856e',opacity:1,'z-index':6}},
         {selector:'.match',style:{'border-width':3,'border-color':'#16836b',opacity:1}},
       ]});
     this.cy.nodes().forEach(node => { this.initial.set(node.id(), { ...node.position() }); });
@@ -163,7 +167,7 @@ export class CircuitGraph {
     this.cy.on('tap','node',event=>{
       const d=event.target.data();
       if(d.kind==='anchor') return;
-      onSelect(d.kind==='component'?{kind:'component',id:d.ref}:{kind:'net',id:d.code});
+      onSelect(d.kind==='component'?{kind:'component',id:d.ref}:d.kind==='pin'?{kind:'pin',id:d.id,ref:d.ref,pin:d.pin}:{kind:'net',id:d.code});
     });
     this.cy.on('dbltap','node[kind = "component"]',event=>this.cy.fit(event.target,30));
     this.cy.on('tap','edge[kind = "wire"]',event=>onSelect({kind:'net',id:event.target.data('code')}));
@@ -186,10 +190,24 @@ export class CircuitGraph {
   select(selection:Selection|null) {
     this.cy.elements().removeClass('active connected');
     if(!selection)return;
-    this.cy.getElementById(`${selection.kind==='component'?'c':'n'}:${selection.id}`).addClass('active');
+    this.cy.getElementById(selection.kind==='pin' ? selection.id : `${selection.kind==='component'?'c':'n'}:${selection.id}`).addClass('active');
     if(selection.kind==='component') this.cy.edges().filter(e=>e.data('ref')===selection.id).addClass('connected');
-    else this.cy.edges().filter(e=>e.data('code')===selection.id).addClass('connected');
+    else if(selection.kind==='net') this.cy.edges().filter(e=>e.data('code')===selection.id).addClass('connected');
+    else this.cy.edges().filter(e=>e.data('pinId')===selection.id).addClass('connected');
     if(selection.kind==='net') this.cy.nodes().filter(n=>n.data('code')===selection.id && n.data('kind')==='bend').addClass('active');
+  }
+  highlightEvidence(result: Explanation | null) {
+    this.cy.elements().removeClass('evidence evidence-muted');
+    if (!result) return;
+    const ids = new Set(result.evidence.nodes.map(n => n.id));
+    const memberships = evidenceMemberships(result);
+    this.cy.elements().addClass('evidence-muted');
+    this.cy.nodes().filter(n => ids.has(n.id())).removeClass('evidence-muted').addClass('evidence');
+    const wires = this.cy.edges().filter(e => e.data('kind') === 'wire' &&
+      memberships.has(JSON.stringify([e.data('pinId'), `n:${e.data('code')}`])));
+    const leads = this.cy.edges().filter(e => e.data('kind') === 'lead' && ids.has(e.data('pinId')));
+    wires.union(leads).removeClass('evidence-muted').addClass('evidence');
+    wires.union(leads).connectedNodes().removeClass('evidence-muted');
   }
   search(query:string) {
     this.cy.elements().removeClass('muted match');
