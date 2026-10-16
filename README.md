@@ -73,18 +73,14 @@ Reference: [FalkorDB Docker documentation](https://docs.falkordb.com/operations/
 
 ## Sample circuits (Part 2)
 
-- [Clean ESP32 + OLED circuit](samples/clean.net)
-- [Same circuit with one supply voltage mismatch](samples/voltage_mismatch.net)
-- [Sample documentation, editable sources and expected results](samples/README.md)
+- [Clean Arduino LED blink circuit](samples/clean.net)
+- [Same circuit with the LED ground connection missing](samples/missing_ground.net)
+- [Sample documentation and editable KiCad sources](samples/README.md)
 
-Both samples were exported from editable KiCad schematics. The only wiring
-change is ESP32 module U1 pin 2 moving from the 3.3 V rail to the 5 V rail.
-
-With KiCad CLI installed, verify the exports, exact connectivity and ERC:
-
-```bash
-python3 scripts/verify_samples.py
-```
+Both samples use the existing Arduino Uno + 330 ohm resistor + red LED example.
+The clean path is D13 -> resistor -> LED -> GND. The faulty sample removes only
+the wire from the LED cathode to GND. Both were exported with KiCad and checked
+against the original circuit's connectivity.
 
 These files are not loaded into FalkorDB yet. Parsing and graph loading are the
 next steps.
