@@ -7,6 +7,25 @@ The local Python environment, FalkorDB Docker setup, and two verified KiCad
 sample netlists are ready. The parser, API, agent, and CircuitDoctor interface
 are planned and are not implemented yet.
 
+## Initial scope (planned)
+
+The first version will target circuits built with:
+
+- Arduino Uno R3.
+- Classic Arduino Nano (ATmega328P).
+
+Users will upload their own KiCad `.net` circuits. Components, pin connections
+and nets will come from the uploaded file; the application must not depend on
+the sample's component names, D13 pin choice or LED wiring.
+
+Diagnosis will use the available board and component information. When the
+information needed for a check is missing, the result must say that the check
+could not be completed, rather than assume the circuit is correct.
+
+The current Uno LED samples are test fixtures. They do not represent the full
+range of circuits the application is intended to handle, and do not establish
+working Uno or Nano diagnostic support yet.
+
 ## Local development setup
 
 Requires Git and Python 3.12 with virtual environment support.

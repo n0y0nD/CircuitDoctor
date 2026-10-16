@@ -3,6 +3,11 @@
 These samples reuse the existing Arduino LED blink circuit: **3 components**,
 with no extra hardware added.
 
+These two fixtures cover one Uno circuit for testing. The planned application
+will read users' own circuits targeting Arduino Uno R3 or classic Arduino Nano
+(ATmega328P); its logic must not depend on this specific LED example. A Nano
+fixture and diagnostic support for either board have not been implemented yet.
+
 | Reference | Component |
 | --- | --- |
 | A1 | Arduino Uno R3, powered through its USB cable |
