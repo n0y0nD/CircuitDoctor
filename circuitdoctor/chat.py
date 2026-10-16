@@ -13,7 +13,7 @@ from .tools import explain_net
 from .review import check_rules
 from .power import trace_power
 
-KEY_FILE = Path(__file__).resolve().parents[1] / '.gemini-api-key'
+KEY_FILE = Path(os.environ.get('GEMINI_API_KEY_FILE') or (Path(__file__).resolve().parents[1] / '.gemini-api-key'))
 CHAT_LOCK = threading.Lock()
 MAX_CALLS = 8
 MAX_CONTEXT = 180_000

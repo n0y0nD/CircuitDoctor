@@ -1,6 +1,9 @@
 import contextlib
 import io
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -135,6 +138,28 @@ class ChatTests(unittest.TestCase):
 
 
 class KeySetupTests(unittest.TestCase):
+    def test_container_key_path_is_shared_by_setup_and_reader(self):
+        # A fresh process exercises environment loading without touching the user's key.
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'gemini-api-key'
+            script = """
+from unittest.mock import patch
+from circuitdoctor import chat, configure_gemini
+assert chat.KEY_FILE == configure_gemini.KEY_FILE
+assert chat.api_key() == ''
+for key in ('synthetic-first-key-00000', 'synthetic-replacement-key-00000'):
+    with patch('sys.stdin.isatty', return_value=True), patch('getpass.getpass', return_value=key):
+        configure_gemini.main()
+    assert chat.api_key() == key
+    assert chat.KEY_FILE.stat().st_mode & 0o777 == 0o600
+"""
+            result = subprocess.run([sys.executable, '-c', script], cwd=Path(__file__).resolve().parents[1],
+                                    env={**os.environ, 'GEMINI_API_KEY_FILE': str(path), 'GEMINI_API_KEY': ''},
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(path.is_file())
+            self.assertNotIn('synthetic-', result.stdout)
+
     def test_auth_key_with_dot_is_saved_privately_without_echo(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / '.gemini-api-key'

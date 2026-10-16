@@ -1,6 +1,29 @@
 name: circuitdoctor
 
 services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:8080:8000"
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      GEMINI_API_KEY_FILE: /app/secrets/gemini-api-key
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+    volumes:
+      - gemini_config:/app/secrets
+    depends_on:
+      falkordb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json, urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/status', timeout=3)); assert r['graph_storage'] == 'connected'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
   falkordb:
     image: falkordb/falkordb:6.0.2
     ports:
@@ -20,3 +43,4 @@ services:
 
 volumes:
   falkordb_data:
+  gemini_config:

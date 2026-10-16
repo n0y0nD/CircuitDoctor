@@ -1,0 +1,917 @@
+(export
+	(version "E")
+	(design
+		(source "/tmp/circuitdoctor-validation/nano_normal.kicad_sch")
+		(date "2026-10-17T04:57:03")
+		(tool "Eeschema 10.0.7")
+		(sheet
+			(number "1")
+			(name "/")
+			(tstamps "/")
+			(title_block
+				(title)
+				(company)
+				(rev)
+				(date)
+				(source "nano_normal.kicad_sch")
+				(comment
+					(number "1")
+					(value "")
+				)
+				(comment
+					(number "2")
+					(value "")
+				)
+				(comment
+					(number "3")
+					(value "")
+				)
+				(comment
+					(number "4")
+					(value "")
+				)
+				(comment
+					(number "5")
+					(value "")
+				)
+				(comment
+					(number "6")
+					(value "")
+				)
+				(comment
+					(number "7")
+					(value "")
+				)
+				(comment
+					(number "8")
+					(value "")
+				)
+				(comment
+					(number "9")
+					(value "")
+				)
+			)
+		)
+	)
+	(components
+		(comp
+			(ref "A7")
+			(value "Arduino_Nano_v3.x")
+			(fields
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "MCU_Module")
+				(part "Arduino_Nano_v3.x")
+				(description "Arduino Nano v3.x")
+			)
+			(property
+				(name "Sheetname")
+				(value "Root")
+			)
+			(property
+				(name "Sheetfile")
+				(value "../../../tmp/circuitdoctor-validation/nano_normal.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "Arduino nano microcontroller module USB")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Arduino*Nano*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "3736cbdf-cfa8-438e-ad79-42e13160bde2")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "2")
+						)
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "5")
+						)
+						(pin
+							(num "6")
+						)
+						(pin
+							(num "7")
+						)
+						(pin
+							(num "8")
+						)
+						(pin
+							(num "9")
+						)
+						(pin
+							(num "10")
+						)
+						(pin
+							(num "11")
+						)
+						(pin
+							(num "12")
+						)
+						(pin
+							(num "13")
+						)
+						(pin
+							(num "14")
+						)
+						(pin
+							(num "15")
+						)
+						(pin
+							(num "16")
+						)
+						(pin
+							(num "30")
+						)
+						(pin
+							(num "4")
+						)
+						(pin
+							(num "17")
+						)
+						(pin
+							(num "29")
+						)
+						(pin
+							(num "27")
+						)
+						(pin
+							(num "28")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "18")
+						)
+						(pin
+							(num "19")
+						)
+						(pin
+							(num "20")
+						)
+						(pin
+							(num "21")
+						)
+						(pin
+							(num "22")
+						)
+						(pin
+							(num "23")
+						)
+						(pin
+							(num "24")
+						)
+						(pin
+							(num "25")
+						)
+						(pin
+							(num "26")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "J9")
+			(value "Unspecified external load")
+			(fields
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Connector_Generic")
+				(part "Conn_01x02")
+				(description "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			)
+			(property
+				(name "Sheetname")
+				(value "Root")
+			)
+			(property
+				(name "Sheetfile")
+				(value "../../../tmp/circuitdoctor-validation/nano_normal.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "connector")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "Connector*:*_1x??_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "d168c179-3aa4-494d-9a5b-d028c43ef733")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R12")
+			(value "1000")
+			(fields
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "Root")
+			)
+			(property
+				(name "Sheetfile")
+				(value "../../../tmp/circuitdoctor-validation/nano_normal.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "5229a754-fe06-49c5-862f-75fc393f0406")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+	)
+	(groups)
+	(variants)
+	(libparts
+		(libpart
+			(lib "Connector_Generic")
+			(part "Conn_01x02")
+			(description "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			(footprints
+				(fp "Connector*:*_1x??_*")
+			)
+			(fields
+				(field
+					(name "Reference") "J")
+				(field
+					(name "Value") "Conn_01x02")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "Pin_1")
+					(type "passive")
+				)
+				(pin
+					(num "2")
+					(name "Pin_2")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "Device")
+			(part "R")
+			(description "Resistor")
+			(footprints
+				(fp "R_*")
+			)
+			(fields
+				(field
+					(name "Reference") "R")
+				(field
+					(name "Value") "R")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "Resistor")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "")
+					(type "passive")
+				)
+				(pin
+					(num "2")
+					(name "")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "MCU_Module")
+			(part "Arduino_Nano_v3.x")
+			(description "Arduino Nano v3.x")
+			(docs "http://www.mouser.com/pdfdocs/Gravitech_Arduino_Nano3_0.pdf")
+			(footprints
+				(fp "Arduino*Nano*")
+			)
+			(fields
+				(field
+					(name "Reference") "A")
+				(field
+					(name "Value") "Arduino_Nano_v3.x")
+				(field
+					(name "Footprint") "Module:Arduino_Nano")
+				(field
+					(name "Datasheet") "http://www.mouser.com/pdfdocs/Gravitech_Arduino_Nano3_0.pdf")
+				(field
+					(name "Description") "Arduino Nano v3.x")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "D1/TX")
+					(type "bidirectional")
+				)
+				(pin
+					(num "2")
+					(name "D0/RX")
+					(type "bidirectional")
+				)
+				(pin
+					(num "3")
+					(name "~{RESET}")
+					(type "input")
+				)
+				(pin
+					(num "4")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "5")
+					(name "D2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "6")
+					(name "D3")
+					(type "bidirectional")
+				)
+				(pin
+					(num "7")
+					(name "D4")
+					(type "bidirectional")
+				)
+				(pin
+					(num "8")
+					(name "D5")
+					(type "bidirectional")
+				)
+				(pin
+					(num "9")
+					(name "D6")
+					(type "bidirectional")
+				)
+				(pin
+					(num "10")
+					(name "D7")
+					(type "bidirectional")
+				)
+				(pin
+					(num "11")
+					(name "D8")
+					(type "bidirectional")
+				)
+				(pin
+					(num "12")
+					(name "D9")
+					(type "bidirectional")
+				)
+				(pin
+					(num "13")
+					(name "D10")
+					(type "bidirectional")
+				)
+				(pin
+					(num "14")
+					(name "D11")
+					(type "bidirectional")
+				)
+				(pin
+					(num "15")
+					(name "D12")
+					(type "bidirectional")
+				)
+				(pin
+					(num "16")
+					(name "D13")
+					(type "bidirectional")
+				)
+				(pin
+					(num "17")
+					(name "3V3")
+					(type "power_out")
+				)
+				(pin
+					(num "18")
+					(name "AREF")
+					(type "input")
+				)
+				(pin
+					(num "19")
+					(name "A0")
+					(type "bidirectional")
+				)
+				(pin
+					(num "20")
+					(name "A1")
+					(type "bidirectional")
+				)
+				(pin
+					(num "21")
+					(name "A2")
+					(type "bidirectional")
+				)
+				(pin
+					(num "22")
+					(name "A3")
+					(type "bidirectional")
+				)
+				(pin
+					(num "23")
+					(name "A4")
+					(type "bidirectional")
+				)
+				(pin
+					(num "24")
+					(name "A5")
+					(type "bidirectional")
+				)
+				(pin
+					(num "25")
+					(name "A6")
+					(type "bidirectional")
+				)
+				(pin
+					(num "26")
+					(name "A7")
+					(type "bidirectional")
+				)
+				(pin
+					(num "27")
+					(name "+5V")
+					(type "power_out")
+				)
+				(pin
+					(num "28")
+					(name "~{RESET}")
+					(type "input")
+				)
+				(pin
+					(num "29")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "30")
+					(name "VIN")
+					(type "power_in")
+				)
+			)
+		)
+	)
+	(libraries
+		(library
+			(logical "Connector_Generic")
+			(uri "${KICAD10_SYMBOL_DIR}/Connector_Generic.kicad_symdir")
+		)
+		(library
+			(logical "Device")
+			(uri "${KICAD10_SYMBOL_DIR}/Device.kicad_symdir")
+		)
+		(library
+			(logical "MCU_Module")
+			(uri "${KICAD10_SYMBOL_DIR}/MCU_Module.kicad_symdir")
+		)
+	)
+	(nets
+		(net
+			(code "1")
+			(name "/LOAD_INPUT")
+			(class "Default")
+			(node
+				(ref "J9")
+				(pin "1")
+				(pinfunction "Pin_1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "R12")
+				(pin "2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "2")
+			(name "/RETURN")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "29")
+				(pinfunction "GND_29")
+				(pintype "power_in")
+			)
+			(node
+				(ref "A7")
+				(pin "4")
+				(pinfunction "GND_4")
+				(pintype "power_in")
+			)
+			(node
+				(ref "J9")
+				(pin "2")
+				(pinfunction "Pin_2_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "3")
+			(name "/SUPPLY")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "27")
+				(pinfunction "+5V_27")
+				(pintype "power_out")
+			)
+			(node
+				(ref "R12")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "4")
+			(name "unconnected-(A7-3V3-Pad17)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "17")
+				(pinfunction "3V3_17")
+				(pintype "power_out+no_connect")
+			)
+		)
+		(net
+			(code "5")
+			(name "unconnected-(A7-A0-Pad19)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "19")
+				(pinfunction "A0_19")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "6")
+			(name "unconnected-(A7-A1-Pad20)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "20")
+				(pinfunction "A1_20")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "7")
+			(name "unconnected-(A7-A2-Pad21)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "21")
+				(pinfunction "A2_21")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "8")
+			(name "unconnected-(A7-A3-Pad22)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "22")
+				(pinfunction "A3_22")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "9")
+			(name "unconnected-(A7-A4-Pad23)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "23")
+				(pinfunction "A4_23")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "10")
+			(name "unconnected-(A7-A5-Pad24)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "24")
+				(pinfunction "A5_24")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "11")
+			(name "unconnected-(A7-A6-Pad25)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "25")
+				(pinfunction "A6_25")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "12")
+			(name "unconnected-(A7-A7-Pad26)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "26")
+				(pinfunction "A7_26")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "13")
+			(name "unconnected-(A7-AREF-Pad18)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "18")
+				(pinfunction "AREF_18")
+				(pintype "input+no_connect")
+			)
+		)
+		(net
+			(code "14")
+			(name "unconnected-(A7-D0{slash}RX-Pad2)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "2")
+				(pinfunction "D0/RX_2")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "15")
+			(name "unconnected-(A7-D1{slash}TX-Pad1)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "1")
+				(pinfunction "D1/TX_1")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "16")
+			(name "unconnected-(A7-D2-Pad5)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "5")
+				(pinfunction "D2_5")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "17")
+			(name "unconnected-(A7-D3-Pad6)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "6")
+				(pinfunction "D3_6")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "18")
+			(name "unconnected-(A7-D4-Pad7)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "7")
+				(pinfunction "D4_7")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "19")
+			(name "unconnected-(A7-D5-Pad8)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "8")
+				(pinfunction "D5_8")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "20")
+			(name "unconnected-(A7-D6-Pad9)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "9")
+				(pinfunction "D6_9")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "21")
+			(name "unconnected-(A7-D7-Pad10)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "10")
+				(pinfunction "D7_10")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "22")
+			(name "unconnected-(A7-D8-Pad11)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "11")
+				(pinfunction "D8_11")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "23")
+			(name "unconnected-(A7-D9-Pad12)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "12")
+				(pinfunction "D9_12")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "24")
+			(name "unconnected-(A7-D10-Pad13)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "13")
+				(pinfunction "D10_13")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "25")
+			(name "unconnected-(A7-D11-Pad14)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "14")
+				(pinfunction "D11_14")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "26")
+			(name "unconnected-(A7-D12-Pad15)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "15")
+				(pinfunction "D12_15")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "27")
+			(name "unconnected-(A7-D13-Pad16)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "16")
+				(pinfunction "D13_16")
+				(pintype "bidirectional+no_connect")
+			)
+		)
+		(net
+			(code "28")
+			(name "unconnected-(A7-VIN-Pad30)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "30")
+				(pinfunction "VIN_30")
+				(pintype "power_in+no_connect")
+			)
+		)
+		(net
+			(code "29")
+			(name "unconnected-(A7-~{RESET}-Pad3)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "3")
+				(pinfunction "~{RESET}_3")
+				(pintype "input+no_connect")
+			)
+		)
+		(net
+			(code "30")
+			(name "unconnected-(A7-~{RESET}-Pad28)")
+			(class "Default")
+			(node
+				(ref "A7")
+				(pin "28")
+				(pinfunction "~{RESET}_28")
+				(pintype "input+no_connect")
+			)
+		)
+	)
+)

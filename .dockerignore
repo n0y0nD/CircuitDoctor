@@ -1,0 +1,17 @@
+# Allow only the source and manifests needed by the image.
+**
+!Dockerfile
+!requirements.txt
+!circuitdoctor/
+!circuitdoctor/**
+!frontend/
+!frontend/**
+!samples/
+!samples/*.net
+**/__pycache__/
+**/*.py[cod]
+**/node_modules/
+frontend/dist/
+**/.env
+**/.env.*
+**/.gemini*
