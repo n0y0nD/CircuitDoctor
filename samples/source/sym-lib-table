@@ -1,0 +1,6 @@
+(sym_lib_table (version 7)
+  (lib (name "RF_Module") (type "KiCad") (uri "${KIPRJMOD}/symbols/RF_Module.kicad_sym") (options "") (descr "Sample symbols"))
+  (lib (name "Connector") (type "KiCad") (uri "${KIPRJMOD}/symbols/Connector.kicad_sym") (options "") (descr "Sample symbols"))
+  (lib (name "Device") (type "KiCad") (uri "${KIPRJMOD}/symbols/Device.kicad_sym") (options "") (descr "Sample symbols"))
+  (lib (name "CircuitDoctor") (type "KiCad") (uri "${KIPRJMOD}/symbols/CircuitDoctor.kicad_sym") (options "") (descr "Sample symbols"))
+)

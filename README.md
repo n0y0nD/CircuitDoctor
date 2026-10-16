@@ -3,8 +3,9 @@ Understand your circuit. Trace the problem. An AI assistant for exploring KiCad 
 
 ## Project status
 
-The local Python environment and FalkorDB Docker setup are ready. The parser,
-API, agent, and CircuitDoctor interface are planned and are not implemented yet.
+The local Python environment, FalkorDB Docker setup, and two verified KiCad
+sample netlists are ready. The parser, API, agent, and CircuitDoctor interface
+are planned and are not implemented yet.
 
 ## Local development setup
 
@@ -69,3 +70,21 @@ docker compose up -d --wait
 For startup troubleshooting, run `docker compose logs --tail=50 falkordb`.
 
 Reference: [FalkorDB Docker documentation](https://docs.falkordb.com/operations/docker).
+
+## Sample circuits (Part 2)
+
+- [Clean ESP32 + OLED circuit](samples/clean.net)
+- [Same circuit with one supply voltage mismatch](samples/voltage_mismatch.net)
+- [Sample documentation, editable sources and expected results](samples/README.md)
+
+Both samples were exported from editable KiCad schematics. The only wiring
+change is ESP32 module U1 pin 2 moving from the 3.3 V rail to the 5 V rail.
+
+With KiCad CLI installed, verify the exports, exact connectivity and ERC:
+
+```bash
+python3 scripts/verify_samples.py
+```
+
+These files are not loaded into FalkorDB yet. Parsing and graph loading are the
+next steps.

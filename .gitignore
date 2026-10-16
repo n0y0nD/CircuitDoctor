@@ -19,3 +19,9 @@ htmlcov/
 .vscode/
 .DS_Store
 *~
+
+# Local KiCad editor state and backups
+*.kicad_prl
+*.lck
+~*.kicad_sch
+*-backups/
