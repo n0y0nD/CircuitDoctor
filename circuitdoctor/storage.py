@@ -247,7 +247,9 @@ class CircuitStore:
                 raise CircuitNotFound(circuit_id)
             if not query("MATCH (m:Circuit {ready:true}) RETURN m.id"):
                 raise CircuitNotFound(circuit_id)
-            component_count = query("MATCH (c:Component) RETURN count(c)")[0][0]
+            component_rows = query("MATCH (c:Component) RETURN c.ref,c.value,c.metadata ORDER BY c.position")
+            components = [{**json.loads(meta), "ref": ref, "value": value}
+                          for ref, value, meta in component_rows]
             nets = {code: {"code": code, "name": label, "pins": []}
                     for code, label in query("MATCH (n:Net) RETURN n.code,n.name ORDER BY n.position")}
             rows = query("MATCH (c:Component)-[:HAS_PIN]->(p:Pin) "
@@ -266,7 +268,7 @@ class CircuitStore:
             else:
                 nets[code]["pins"].append(record)
         return {"source": "falkordb", "circuit_id": circuit_id, "graph_name": name,
-                "component_count": component_count, "nets": list(nets.values()),
+                "component_count": len(components), "components": components, "nets": list(nets.values()),
                 "pins": list(pins.values()), "unassigned_pins": unassigned, "queries": queries}
 
 

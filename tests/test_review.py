@@ -60,7 +60,7 @@ class ReviewIntegrationTests(unittest.TestCase):
         self.assertIn('p:["D1","1"]', [n['id'] for n in finding['evidence']['nodes']])
         self.assertEqual(len(finding['evidence']['paths'][0]), 3)
         self.assertTrue(clean['cannot_verify'])
-        self.assertEqual(clean['scope'], 'connectivity_only')
+        self.assertEqual(clean['scope'], 'connectivity_and_board_rails')
 
     def test_renamed_circuit_uses_metadata_not_net_names_or_reference_prefixes(self):
         data = parse_netlist('''(export (components (comp (ref CUSTOM) (value module)))

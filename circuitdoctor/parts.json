@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "verified_on": "2026-10-17",
+  "scope": "Nominal board power rails only; no GPIO limits, load currents or external-part ratings.",
+  "matching": "Exact KiCad library and part identity, then exported pin names. Pin numbers are never mapped to physical board positions.",
+  "notes": [
+    "Nominal rail voltages describe the design, not a measurement or proof of power.",
+    "Nano pinout and power-tree description identify the 3.3V rail; the datasheet connector table has a contradictory 5V USB description for +3V3. The 5V USB wording is not used."
+  ],
+  "parts": [
+    {
+      "id": "Arduino_UNO_R3",
+      "name": "Arduino Uno R3",
+      "match": {
+        "lib": "MCU_Module",
+        "part": "Arduino_UNO_R3"
+      },
+      "pins": [
+        {
+          "names": [
+            "+5V",
+            "5V"
+          ],
+          "role": "rail",
+          "nominal_voltage": 5.0
+        },
+        {
+          "names": [
+            "+3V3",
+            "3V3",
+            "3.3V",
+            "+3.3V"
+          ],
+          "role": "rail",
+          "nominal_voltage": 3.3
+        },
+        {
+          "names": [
+            "GND"
+          ],
+          "role": "ground",
+          "nominal_voltage": 0.0
+        },
+        {
+          "names": [
+            "IOREF"
+          ],
+          "role": "rail",
+          "nominal_voltage": 5.0
+        }
+      ],
+      "sources": [
+        {
+          "title": "Arduino Uno R3 official pinout",
+          "url": "https://docs.arduino.cc/resources/pinouts/A000066-full-pinout.pdf"
+        },
+        {
+          "title": "Arduino Uno R3 official datasheet",
+          "url": "https://docs.arduino.cc/resources/datasheets/A000066-datasheet.pdf"
+        }
+      ]
+    },
+    {
+      "id": "Arduino_Nano_v3.x",
+      "name": "Classic Arduino Nano",
+      "match": {
+        "lib": "MCU_Module",
+        "part": "Arduino_Nano_v3.x"
+      },
+      "pins": [
+        {
+          "names": [
+            "+5V",
+            "5V"
+          ],
+          "role": "rail",
+          "nominal_voltage": 5.0
+        },
+        {
+          "names": [
+            "+3V3",
+            "3V3",
+            "3.3V",
+            "+3.3V"
+          ],
+          "role": "rail",
+          "nominal_voltage": 3.3
+        },
+        {
+          "names": [
+            "GND"
+          ],
+          "role": "ground",
+          "nominal_voltage": 0.0
+        }
+      ],
+      "sources": [
+        {
+          "title": "Classic Arduino Nano official pinout",
+          "url": "https://docs.arduino.cc/resources/pinouts/A000005-full-pinout.pdf"
+        },
+        {
+          "title": "Classic Arduino Nano official datasheet",
+          "url": "https://docs.arduino.cc/resources/datasheets/A000005-datasheet.pdf"
+        }
+      ]
+    }
+  ]
+}

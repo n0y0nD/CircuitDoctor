@@ -66,13 +66,13 @@ $("#app").innerHTML = `
       <span class="file-note">KiCad netlist · Up to 10 MiB</span>
     </div>
     <button class="text-button help-trigger">Where do I get a .net file? ${icon("chevron", 14)}</button>
-    <p class="scope-note">Explore connections and run a basic connectivity review. Voltage checks and AI chat are still in development.</p>
+    <p class="scope-note">Explore connections and check Arduino power-rail wiring. Full electrical diagnosis and AI chat are still in development.</p>
   </section>
   <div id="loading-overlay" class="loading-overlay" role="status" hidden><span class="spinner"></span> Reading your circuit…</div>
   <section class="circuit-section" id="circuit-section" aria-label="Your uploaded circuit" hidden>
     <div class="circuit-topline"><div class="circuit-title-group"><span class="file-icon">${icon("file", 23)}</span><div><h1 id="circuit-title"></h1><p id="circuit-summary"></p></div></div><button class="icon-button" id="clear-circuit" aria-label="Close circuit and return to upload" title="Close circuit">${icon("close", 19)}</button></div>
     <section class="review-panel" aria-label="Circuit review">
-      <div class="review-heading"><div><h2>Connectivity review</h2><p>Check the connections in your uploaded file.</p></div><button id="run-review" class="button primary">Run review</button></div>
+      <div class="review-heading"><div><h2>Circuit review</h2><p>Check connections and supported Arduino power rails.</p></div><button id="run-review" class="button primary">Run review</button></div>
       <div id="review-results" aria-live="polite"></div>
     </section>
     <div class="workbench">
@@ -302,7 +302,7 @@ function renderList() {
 function renderInspector() {
   const findingPanel = $("#selected-finding");
   findingPanel.hidden = !selectedFinding;
-  findingPanel.innerHTML = selectedFinding ? `<div class="finding-detail"><span class="finding-severity">${selectedFinding.severity === "warning" ? "Check this connection" : "Information"}</span><h3>${esc(selectedFinding.title)}</h3><p>${esc(selectedFinding.message)}</p><p><strong>What to check:</strong> ${esc(selectedFinding.suggestion)}</p></div>` : "";
+  findingPanel.innerHTML = selectedFinding ? `<div class="finding-detail"><span class="finding-severity">${selectedFinding.severity === "warning" ? "Check this connection" : "Information"}</span><h3>${esc(selectedFinding.title)}</h3><p>${esc(selectedFinding.message)}</p><p><strong>What to check:</strong> ${esc(selectedFinding.suggestion)}</p>${sourceLinks(selectedFinding.sources || [])}</div>` : "";
   renderExplanation();
   if (!circuit || !selection) {
     $("#inspector-body").innerHTML =
@@ -354,6 +354,9 @@ async function explainSelection() {
   });
 }
 
+function sourceLinks(sources: { title: string; url: string }[]) {
+  return sources.filter(source => source.url.startsWith("https://docs.arduino.cc/")).map(source => `<a class="spec-source" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)} ↗</a>`).join("");
+}
 function renderReview() {
   const button = $<HTMLButtonElement>("#run-review");
   button.disabled = review.status === "loading";
@@ -366,8 +369,8 @@ function renderReview() {
   const warnings = result.findings.filter(f => f.severity === "warning");
   const information = result.findings.filter(f => f.severity === "info");
   const cards = (items: Finding[]) => items.map(f => `<button class="finding-card ${f.severity}" data-finding="${esc(f.id)}"><span>${f.severity === "warning" ? "Possible issue" : "Information"}</span><strong>${esc(f.title)}</strong><p>${esc(f.message)}</p><small>Inspect connection →</small></button>`).join("");
-  const heading = result.status === "incomplete" ? "Not enough circuit data to review" : warnings.length ? `${warnings.length} connection${warnings.length === 1 ? "" : "s"} to check` : "No single-pin warnings found";
-  panel.innerHTML = `<h3 class="review-summary">${esc(heading)}</h3><p class="review-note">${result.summary.nets} nets checked · ${result.summary.marked_unused_pins} pins marked unused. This is a basic connectivity review, not confirmation that the circuit works.</p><div class="finding-list">${cards(warnings)}</div>${information.length ? `<details class="review-details"><summary>${information.length} informational finding${information.length === 1 ? "" : "s"}</summary><div class="finding-list">${cards(information)}</div></details>` : ""}<details class="review-details"><summary>What we cannot verify yet</summary>${result.cannot_verify.map(item => `<p><strong>${esc(item.check)}:</strong> ${esc(item.reason)}</p>`).join("")}<p>${result.summary.unknown_pin_names} pins have no name metadata; ${result.summary.unknown_pin_types} have no type metadata. No board pin mapping or electrical limits were guessed.</p></details>`;
+  const heading = result.status === "incomplete" ? "Not enough circuit data to review" : warnings.length ? `${warnings.length} connection${warnings.length === 1 ? "" : "s"} to check` : "No warnings from the available checks";
+  panel.innerHTML = `<h3 class="review-summary">${esc(heading)}</h3><p class="review-note">${result.summary.nets} nets checked · ${result.summary.marked_unused_pins} pins marked unused. Includes limited Arduino power-rail checks; this does not confirm that the circuit works.</p><div class="finding-list">${cards(warnings)}</div>${information.length ? `<details class="review-details"><summary>${information.length} informational finding${information.length === 1 ? "" : "s"}</summary><div class="finding-list">${cards(information)}</div></details>` : ""}<details class="review-details"><summary>Board specifications used · ${result.electrical.recognized_parts.length} matched</summary><p>${result.electrical.checked_nets} nets checked using ${result.electrical.matched_power_pins} identified power/ground pins. Checks: ${esc(result.electrical.checks.join("; "))}.</p>${result.electrical.recognized_parts.map(part => `<p><strong>${esc(part.ref)} · ${esc(part.name)}</strong></p>${sourceLinks(part.sources)}`).join("")}<p>${result.electrical.unknown_components.length ? `No electrical specifications for: ${esc(result.electrical.unknown_components.join(", "))}. Their connections are still included.` : "All component identities matched the supported board catalog."}</p></details><details class="review-details"><summary>What we cannot verify yet</summary>${result.cannot_verify.map(item => `<p><strong>${esc(item.check)}:</strong> ${esc(item.reason)}</p>`).join("")}<p>${result.summary.unknown_pin_names} pins have no name metadata; ${result.summary.unknown_pin_types} have no type metadata. No board pin mapping or electrical limits were guessed.</p></details>`;
 }
 async function runReview() {
   if (!circuit) return;

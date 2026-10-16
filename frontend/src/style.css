@@ -232,3 +232,4 @@ dialog p { font-size: 12px; line-height: 1.7; color: var(--muted); }
 .finding-detail { padding: 18px; background: #fffaf1; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .finding-detail h3 { font-size: 14px; }
 @media (max-width: 500px) { .review-heading { align-items: stretch; flex-direction: column; } }
+.spec-source { display: block; width: fit-content; margin: 7px 0; color: #16836b; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }

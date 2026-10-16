@@ -36,7 +36,7 @@ def status():
     except StorageUnavailable:
         connected = False
     return {"parser": "ready", "graph_storage": "connected" if connected else "unavailable",
-            "review": "connectivity_only"}
+            "review": "connectivity_and_board_rails"}
 
 
 @app.get("/api/samples/{name}")

@@ -1,5 +1,6 @@
 """Conservative connectivity review; no datasheet assumptions or LLM verdicts."""
 
+from .parts import electrical_review
 from .tools import _known, _marked_unused, _pin_label, describe_connection
 
 
@@ -32,23 +33,30 @@ def check_rules(store, circuit_id):
                 f'{_pin_label(pin)} exists in the saved graph but has no net membership.',
                 "Check the schematic if this pin is needed. The export alone does not tell us whether it should be connected; this is not a confirmed wiring fault.", pin=pin)
 
+    electrical = electrical_review(facts)
+    for item in electrical["findings"]:
+        add(item["rule"], "warning", item["title"], item["message"], item["suggestion"], net=item["net"])
+        findings[-1].update(sources=item["sources"], specifications=item["specifications"])
+
     warning_count = sum(item["severity"] == "warning" for item in findings)
     empty = not facts["component_count"] or not facts["nets"]
     unknown_names = sum(not _known(pin["name"]) and not _known(pin["pinfunction"]) for pin in facts["pins"])
     unknown_types = sum(not _known(pin["library_type"]) and not _known(pin["pintype"]) for pin in facts["pins"])
     cannot_verify = [
-        {"check": "Voltage compatibility", "reason": "Verified component voltage limits and power-source information are not available yet."},
+        {"check": "Full voltage compatibility", "reason": "Only direct connections between identified Uno R3 / classic Nano power and ground pins are checked. GPIO limits, external parts, VIN and actual supply voltages are not verified."},
         {"check": "Required connections and pull-ups", "reason": "Connectivity alone does not establish which pins or external resistors the design requires."},
         {"check": "Circuit operation", "reason": "Firmware, current, physical wiring and component health are not checked."},
     ]
+    if electrical["coverage"]["conflicting_pin_metadata"]:
+        cannot_verify.insert(0, {"check": "Conflicting pin metadata", "reason": "Some library pin names conflict with exported pin functions. Those pins were excluded from electrical checks."})
     if empty:
         cannot_verify.insert(0, {"check": "Complete connectivity review", "reason": "This export has no components or no nets to review."})
     return {"tool": "check_rules", "source": "falkordb", "circuit_id": circuit_id,
-            "scope": "connectivity_only", "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
+            "scope": "connectivity_and_board_rails", "electrical": electrical["coverage"], "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
             "summary": {"components": facts["component_count"], "nets": len(facts["nets"]),
                         "pins": len(facts["pins"]), "warnings": warning_count,
                         "information": len(findings) - warning_count, "marked_unused_pins": unused,
                         "unknown_pin_names": unknown_names, "unknown_pin_types": unknown_types},
             "findings": findings, "cannot_verify": cannot_verify, "queries": facts["queries"],
-            "limitations": ["Basic connectivity review only. No warnings does not mean the circuit is electrically correct.",
+            "limitations": ["Connectivity and limited board power-rail checks only. No warnings does not mean the circuit is electrically correct.",
                             "Unused markers are read from pin metadata, not inferred from net names."]}

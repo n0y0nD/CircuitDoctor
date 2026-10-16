@@ -8,12 +8,14 @@ export interface Finding {
   suggestion: string;
   selection: { net_code: string } | { ref: string; pin: string };
   evidence: Explanation['evidence'];
+  sources?: { title: string; url: string }[];
 }
 export interface Review {
   source: 'falkordb';
   circuit_id: string;
-  scope: 'connectivity_only';
+  scope: 'connectivity_and_board_rails';
   status: 'incomplete' | 'warnings' | 'no_warnings';
+  electrical: { recognized_parts: { ref: string; name: string; sources: { title: string; url: string }[] }[]; unknown_components: string[]; matched_power_pins: number; checked_nets: number; checks: string[]; conflicting_pin_metadata: { ref: string; pin: string }[] };
   summary: { components: number; nets: number; pins: number; warnings: number; information: number; marked_unused_pins: number; unknown_pin_names: number; unknown_pin_types: number };
   findings: Finding[];
   cannot_verify: { check: string; reason: string }[];
@@ -35,7 +37,7 @@ export class ReviewRequest {
       });
       const result = await response.json().catch(() => null);
       if (!response.ok) throw new Error(typeof result?.detail === 'string' ? result.detail : 'Could not run review. Check the local services and try again.');
-      if (result?.source !== 'falkordb' || result.circuit_id !== circuitId || result.scope !== 'connectivity_only' || !Array.isArray(result.findings))
+      if (result?.source !== 'falkordb' || result.circuit_id !== circuitId || result.scope !== 'connectivity_and_board_rails' || !Array.isArray(result.findings))
         throw new Error('The server did not return a review for this circuit.');
       if (version === this.version) update({ status: 'success', result });
     } catch (error) {

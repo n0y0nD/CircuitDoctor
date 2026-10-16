@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ReviewRequest } from '../src/review.ts';
-const data = id => ({ source: 'falkordb', circuit_id: id, scope: 'connectivity_only', findings: [] });
+const data = id => ({ source: 'falkordb', circuit_id: id, scope: 'connectivity_and_board_rails', findings: [] });
 const response = (body, status = 200) => new Response(JSON.stringify(body), { status });
 
 test('rerun and circuit-close ignore outdated reviews, including requests that ignore cancellation', async t => {
