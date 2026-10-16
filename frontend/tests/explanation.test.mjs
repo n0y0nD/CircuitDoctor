@@ -57,3 +57,29 @@ test('highlight memberships distinguish different pins on the same component and
   assert.ok(!memberships.has(JSON.stringify(['p:["CTRL7","02"]', 'n:007'])));
   assert.ok(!memberships.has(JSON.stringify([pin, 'n:008'])));
 });
+
+test('power traces use the dedicated endpoint and cannot be replaced by a stale explanation', async t => {
+  const pending = [];
+  t.mock.method(globalThis, 'fetch', (url, options) => new Promise(resolve => pending.push({ url, options, resolve })));
+  const request = new ExplanationRequest();
+  const states = [];
+  const first = request.run('current', { kind: 'net', id: '007' }, s => states.push(s));
+  const next = request.run('current', { kind: 'net', id: '007' }, s => states.push(s), 'power-trace');
+  assert.equal(pending[1].url, '/api/circuits/current/power-trace');
+  pending[1].resolve(response({ ...result('current'), tool: 'trace_power', scope: 'direct_board_rail' }));
+  await next;
+  pending[0].resolve(response(result('current')));
+  await first;
+  assert.equal(states.at(-1).result.tool, 'trace_power');
+  assert.equal(states.filter(s => s.status === 'success').length, 1);
+});
+
+test('power trace handles unsupported pins, outages, and wrong tool responses', async t => {
+  const replies = [response({ detail: 'Select a known power pin' }, 422), response({ detail: 'Database offline' }, 503), response(result('current'))];
+  t.mock.method(globalThis, 'fetch', async () => replies.shift());
+  const request = new ExplanationRequest();
+  const states = [];
+  for (let i = 0; i < 3; i++) await request.run('current', { kind: 'net', id: '007' }, s => states.push(s), 'power-trace');
+  assert.deepEqual(states.map(s => s.status), ['loading', 'error', 'loading', 'error', 'loading', 'error']);
+  assert.equal(states[1].message, 'Select a known power pin');
+});

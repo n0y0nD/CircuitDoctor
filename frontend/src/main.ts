@@ -340,9 +340,9 @@ function renderExplanation() {
   panel.hidden = !circuit || !selection || selection.kind === "component";
   if (panel.hidden) return;
   const loading = explanation.status === "loading";
-  panel.innerHTML = `<button id="explain-connection" class="button primary" ${loading ? 'disabled' : ''}>${loading ? '<span class="spinner small"></span> Reading connections…' : explanation.status === "error" ? "Try again" : "Explain connection"}</button><div id="explanation-result" aria-live="polite" aria-atomic="true">${explanation.status === "success" ? `<p class="evidence-source">${icon("check", 14)} From your saved circuit</p><p class="explanation-summary">${esc(explanation.result.summary)}</p><p class="explanation-hint">Matching pins and wires are highlighted in the Circuit view.</p><p class="explanation-limit">Connectivity only · This does not confirm whether the circuit works.</p>` : explanation.status === "error" ? `<p class="explanation-error" role="alert">${esc(explanation.message)}</p>` : '<p class="explanation-hint">See what’s connected, using the saved circuit’s actual connections.</p>'}</div>`;
+  panel.innerHTML = `<button id="explain-connection" class="button primary" ${loading ? 'disabled' : ''}>${loading ? '<span class="spinner small"></span> Reading connections…' : "Explain connection"}</button><button id="trace-power" class="button secondary" ${loading ? 'disabled' : ''}>Trace power rail</button><div id="explanation-result" aria-live="polite" aria-atomic="true">${explanation.status === "success" ? `<p class="evidence-source">${icon("check", 14)} From your saved circuit</p><p class="explanation-summary">${esc(explanation.result.summary)}</p><p class="explanation-hint">Matching pins and wires are highlighted in the Circuit view.</p>${explanation.result.tool === "trace_power" ? `<h4>Direct power connections</h4>${(explanation.result.warnings || []).map(w => `<p class="explanation-error">${esc(w)}</p>`).join("")}<details><summary>Trace limits &amp; sources</summary>${explanation.result.limitations.map(l => `<p class="explanation-limit">${esc(l)}</p>`).join("")}${sourceLinks(explanation.result.sources || [])}</details>` : `<p class="explanation-limit">Connectivity only · This does not confirm whether the circuit works.</p>`}` : explanation.status === "error" ? `<p class="explanation-error" role="alert">${esc(explanation.message)}</p>` : '<p class="explanation-hint">Explain any connection, or trace a known Arduino power pin and the parts on its net.</p>'}</div>`;
 }
-async function explainSelection() {
+async function explainSelection(mode: "explain" | "power-trace" = "explain") {
   if (!circuit || !selection || selection.kind === "component") return;
   selectedFinding = null;
   renderInspector();
@@ -351,7 +351,7 @@ async function explainSelection() {
     explanation = state;
     renderExplanation();
     graph?.highlightEvidence(state.status === "success" ? state.result : null);
-  });
+  }, mode);
 }
 
 function sourceLinks(sources: { title: string; url: string }[]) {
@@ -412,6 +412,7 @@ document.addEventListener("click", (event) => {
     renderView();
   }
   if (target.closest("#explain-connection:not(:disabled)")) void explainSelection();
+  if (target.closest("#trace-power:not(:disabled)")) void explainSelection("power-trace");
   const pin = target.closest<HTMLElement>("[data-pin-ref]");
   if (pin) selectItem({ kind: "pin", id: `p:${JSON.stringify([pin.dataset.pinRef!, pin.dataset.pin!])}`, ref: pin.dataset.pinRef!, pin: pin.dataset.pin! });
   const comp = target.closest<HTMLElement>("[data-component]");

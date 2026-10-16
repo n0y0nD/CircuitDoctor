@@ -2,6 +2,9 @@ import type { Selection } from './types';
 
 export interface Explanation {
   source: 'falkordb';
+  tool?: string;
+  warnings?: string[];
+  sources?: { title: string; url: string }[];
   circuit_id: string;
   summary: string;
   evidence: {
@@ -31,7 +34,7 @@ export class ExplanationRequest {
     this.controller?.abort();
     this.controller = null;
   }
-  async run(circuitId: string, selection: Selection, update: (state: ExplanationState) => void) {
+  async run(circuitId: string, selection: Selection, update: (state: ExplanationState) => void, mode: 'explain' | 'power-trace' = 'explain') {
     this.cancel();
     const selector = explanationSelector(selection);
     if (!selector) return;
@@ -39,13 +42,13 @@ export class ExplanationRequest {
     this.controller = new AbortController();
     update({ status: 'loading' });
     try {
-      const response = await fetch(`/api/circuits/${encodeURIComponent(circuitId)}/explain`, {
+      const response = await fetch(`/api/circuits/${encodeURIComponent(circuitId)}/${mode}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(selector), signal: this.controller.signal,
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(typeof data?.detail === 'string' ? data.detail : 'Could not explain this connection. Check the local services and try again.');
-      if (data?.source !== 'falkordb' || data.circuit_id !== circuitId || !data.evidence || typeof data.summary !== 'string')
+      if (data?.source !== 'falkordb' || data.circuit_id !== circuitId || !data.evidence || typeof data.summary !== 'string' || (mode === 'power-trace' && (data.tool !== 'trace_power' || data.scope !== 'direct_board_rail')))
         throw new Error('The server did not return connection evidence for this circuit.');
       if (version === this.version) update({ status: 'success', result: data });
     } catch (error) {

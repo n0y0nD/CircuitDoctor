@@ -13,6 +13,7 @@ from .parser import MAX_FILE_BYTES, NetlistParseError, load_netlist, parse_netli
 from .storage import AmbiguousConnection, ConnectionNotFound, CircuitNotFound, StorageUnavailable, get_store
 from .tools import explain_net
 from .review import check_rules
+from .power import trace_power
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = {"clean": "clean.net", "missing-ground": "missing_ground.net"}
@@ -117,6 +118,18 @@ def explain_connection(circuit_id: str, selection: ExplainRequest):
 @app.post("/api/circuits/{circuit_id}/review")
 def review_circuit(circuit_id: str):
     return check_rules(get_store(), circuit_id)
+
+
+@app.post("/api/circuits/{circuit_id}/power-trace")
+def power_trace(circuit_id: str, selection: ExplainRequest):
+    try:
+        return trace_power(get_store(), circuit_id, **selection.model_dump())
+    except ConnectionNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except AmbiguousConnection as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 # After `npm run build`, the same local API can serve the complete workspace.
