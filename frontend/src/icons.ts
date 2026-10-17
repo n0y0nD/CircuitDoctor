@@ -25,6 +25,12 @@ const paths: Record<string, string> = {
   resistor:
     '<path d="M3 12h4m10 0h4"/><rect x="7" y="8" width="10" height="8" rx="1"/>',
   led: '<path d="m7 8 7 4-7 4zM14 7v10M3 12h4m7 0h7M12 4l3-3m1 5 3-3"/>',
+  oled: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="6" y="8" width="12" height="7"/><path d="M7 19v3m5-3v3m5-3v3"/>',
+  lcd: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 9h12M6 13h12M7 19v3m5-3v3m5-3v3"/>',
+  diode: '<path d="M3 12h5m8 0h5M8 7v10l8-5zM16 7v10"/>',
+  battery: '<path d="M3 12h6m6 0h6M9 5v14M15 8v8"/>',
+  capacitor: '<path d="M3 12h6m6 0h6M9 5v14M15 5v14"/>',
+  ground: '<path d="M12 3v9M3 12h18M6 16h12M9 20h6"/>',
   copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
 };
 export function icon(name: string, size = 20) {

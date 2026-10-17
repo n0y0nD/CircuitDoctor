@@ -56,11 +56,20 @@ export const isUnused = (net: Net) =>
 
 export function componentKind(
   component: Component,
-): "board" | "resistor" | "led" | "component" {
+): "board" | "resistor" | "led" | "oled" | "lcd" | "diode" | "battery" | "capacitor" | "ground" | "component" {
   const part = component.libsource.part || component.value;
   if (["Arduino_UNO_R3", "Arduino_Nano_v3.x"].includes(part)) return "board";
   if (part === "R" || part === "R_Small") return "resistor";
   if (part === "LED" || part.startsWith("LED_")) return "led";
+  const lib = component.libsource.lib;
+  // Match symbol identities, not arbitrary user values such as "OLED controller".
+  if (lib === "Display_Graphic" && /(?:OLED|^SSD1306$|^SSD1309$)/i.test(part)) return "oled";
+  if (lib === "Display_Character" || (lib === "Display_Graphic" && /^LCD[-_]/i.test(part))) return "lcd";
+  if (lib === "Device" && /^(D|D_Small|D_Schottky|D_Schottky_Small|D_Zener|D_Zener_Small)$/.test(part)) return "diode";
+  if (lib === "Diode" && /^(1N4148|1N400[1-7]|1N581[7-9]|BAT54|SS14)$/.test(part)) return "diode";
+  if (lib === "Device" && /^(Battery|Battery_Cell)$/.test(part)) return "battery";
+  if (lib === "Device" && /^(C|C_Small|C_Polarized|C_Polarized_Small)$/.test(part)) return "capacitor";
+  if (lib === "power" && /^(GND|GNDA|GNDD|GNDPWR)$/.test(part)) return "ground";
   return "component";
 }
 

@@ -2,6 +2,7 @@ import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
 import { componentKind, displayValue, visibleNets, netLabel, pinName, type Circuit, type Selection } from './types';
 import { circuitArt } from './circuit-art';
 import { boardDrawing } from './board-art';
+import { partDrawing, groundImage, isGroundNet } from './part-art';
 import { evidenceMemberships, type Explanation } from './explanation';
 
 const colors = ['#168673', '#517caf', '#ac7c36', '#8e6eb0', '#458c98', '#ad6676'];
@@ -24,13 +25,13 @@ export class CircuitGraph {
     if (arrangements.size > 20) arrangements.delete(arrangements.keys().next().value!);
     const nets = visibleNets(circuit, showUnused, selection);
     const root = circuit.components.find(c => componentKind(c) === 'board') || circuit.components[0];
-    const ground = (name: string) => /^(GND|GROUND|VSS)$/i.test(name.replace(/^\//,''));
+    const ground = (net: Circuit['nets'][number]) => isGroundNet(circuit, net);
     // Connectivity determines placement; shared ground does not flatten every component into one column.
     const levels = new Map<string,number>();
     if(root) levels.set(root.ref,0);
     for(let pass=0;pass<circuit.components.length;pass++) {
       let changed = false;
-      for(const net of nets.filter(n=>!ground(n.name))) {
+      for(const net of nets.filter(n=>!ground(n))) {
         const known = net.nodes.map(p=>levels.get(p.ref)).filter((v):v is number=>v!==undefined);
         if(!known.length) continue;
         const next = Math.min(...known)+1;
@@ -38,16 +39,16 @@ export class CircuitGraph {
       }
       if(!changed) break;
     }
-    const drawings = new Map(circuit.components.filter(c=>componentKind(c)==='board').map(c=>[c.ref,boardDrawing(circuit,c)]));
+    const drawings = new Map(circuit.components.map(c=>[c.ref,componentKind(c)==='board'?boardDrawing(circuit,c):partDrawing(circuit,c)] as const).filter((entry): entry is readonly [string, ReturnType<typeof boardDrawing>] => entry[1] !== null));
     const positions = new Map<string,{x:number;y:number;width:number;height:number}>();
     for(const component of circuit.components) {
       const level = levels.get(component.ref) ?? 1;
       const pins = nets.flatMap(n=>n.nodes.filter(p=>p.ref===component.ref));
       const board = componentKind(component)==='board';
-      const height = board ? drawings.get(component.ref)!.height : Math.max(140,Math.ceil(pins.length/2)*28+55);
+      const height = drawings.get(component.ref)?.height ?? Math.max(140,Math.ceil(pins.length/2)*28+55);
       const previous = circuit.components.filter(c=>positions.has(c.ref) && (levels.get(c.ref)??1)===level);
       const y = previous.reduce((total,c)=>total+positions.get(c.ref)!.height+100,0)+height/2;
-      positions.set(component.ref,{x:level*440,y:Math.max(y,170),width:board?drawings.get(component.ref)!.width:180,height});
+      positions.set(component.ref,{x:level*580,y:Math.max(y,170),width:drawings.get(component.ref)?.width ?? 180,height});
     }
     const elements: ElementDefinition[] = [];
     const portSides = new Map<string, number>();
@@ -62,8 +63,8 @@ export class CircuitGraph {
         const left = neighborX.length && neighborX.reduce((a,b)=>a+b,0)/neighborX.length < pos.x;
         if(!board && pins.length===2) {
           // Two-terminal parts need distinct physical terminals even when both neighbors are on one side.
-          const incoming = pins.findIndex(p=>!ground(p.net.name) && p.net.nodes.some(n=>n.ref!==component.ref && positions.get(n.ref)!.x<pos.x));
-          const firstSignal = pins.findIndex(p=>!ground(p.net.name));
+          const incoming = pins.findIndex(p=>!ground(p.net) && p.net.nodes.some(n=>n.ref!==component.ref && positions.get(n.ref)!.x<pos.x));
+          const firstSignal = pins.findIndex(p=>!ground(p.net));
           const leftIndex = incoming>=0 ? incoming : Math.max(0,firstSignal);
           sides[index===leftIndex?'left':'right'].push(entry);
         } else sides[left?'left':'right'].push(entry);
@@ -80,9 +81,9 @@ export class CircuitGraph {
         portSides.set(id,(socket?.side || side)==='left' ? -1 : 1);
         const name = pinName(circuit,pin);
         elements.push({data:{id,kind:'pin',ref:pin.ref,pin:pin.pin,code:net.code,
-          label:board?'':name===`Pin ${pin.pin}`?name:`${pin.pin} · ${name}`,board:board?'yes':'no',
+          label:socket?'':name===`Pin ${pin.pin}`?name:`${pin.pin} · ${name}`,board:board?'yes':'no',
           search:`${pin.ref} ${pin.pin} ${name}`.toLowerCase()},position:{x,y}});
-        if (board) return; // The wire starts on the illustrated socket itself.
+        if (socket) return; // The wire starts on the illustrated terminal itself.
         // Short leads attach each exported pin to its own component. They are not electrical shorts.
         const anchor = `a:${id}`;
         elements.push({data:{id:anchor,kind:'anchor',ref:pin.ref,search:''},position:{x:pos.x+(side==='left'?-1:1)*pos.width/2,y}});
@@ -93,10 +94,17 @@ export class CircuitGraph {
     nets.forEach((net,index)=>{
       const points = net.nodes.map(p=>ports.get(pinId(p.ref,p.pin))!).filter(Boolean);
       const x = points.reduce((sum,p)=>sum+p.x,0)/Math.max(points.length,1);
-      const y = ground(net.name) ? bottom+index*8 : points.reduce((sum,p)=>sum+p.y,0)/Math.max(points.length,1)-55-(index%3)*23;
-      const color = ground(net.name)?'#647982':colors[index%colors.length];
+      // A terminal pointing away from its peers routes around the part, not through its drawing.
+      const wrapsPart = net.nodes.some(pin=>{
+        const point = ports.get(pinId(pin.ref,pin.pin))!;
+        const side = portSides.get(pinId(pin.ref,pin.pin))!;
+        return net.nodes.some(other=>other.ref!==pin.ref && (ports.get(pinId(other.ref,other.pin))!.x-point.x)*side<0);
+      });
+      const top = Math.min(...net.nodes.map(pin=>{const pos=positions.get(pin.ref)!;return pos.y-pos.height/2;}));
+      const y = ground(net) ? bottom+index*16 : wrapsPart ? top-55-index*26 : points.reduce((sum,p)=>sum+p.y,0)/Math.max(points.length,1)-55-(index%3)*23;
+      const color = ground(net)?'#647982':colors[index%colors.length];
       elements.push({data:{id:`n:${net.code}`,kind:'net',code:net.code,label:netLabel(net),
-        single:net.nodes.length===1?'yes':'no',color,search:net.name.toLowerCase()},position:{x,y}});
+        single:net.nodes.length===1?'yes':'no',ground:ground(net)?'yes':'no',image:ground(net)?groundImage:'',color,search:net.name.toLowerCase()},position:{x,y}});
       net.nodes.forEach((pin,pinIndex)=>{
         const source = pinId(pin.ref,pin.pin);
         const point = ports.get(source)!;
@@ -127,6 +135,7 @@ export class CircuitGraph {
         {selector:'node[kind = "net"]',style:{width:9,height:9,'background-color':'data(color)',label:'data(label)',
           'font-size':13,color:'#425e52','text-valign':'top','text-margin-y':-8,'text-background-color':'#fbfdfc',
           'text-background-opacity':1,'text-background-padding':'4px','overlay-opacity':0}},
+        {selector:'node[ground = "yes"]',style:{width:32,height:28,'background-image':'data(image)','background-fit':'contain','background-opacity':0,'border-width':0}},
         {selector:'node[single = "yes"]',style:{'background-color':'#d09b40','border-width':2,'border-color':'#b5832d'}},
         {selector:'edge',style:{width:2,'line-color':'data(color)','curve-style':'straight','source-endpoint':'outside-to-node','target-endpoint':'outside-to-node','overlay-opacity':0}},
         {selector:'edge[kind = "lead"]',style:{'curve-style':'straight',width:2}},
