@@ -6,6 +6,8 @@ export class PathPanel {
   private request = new PathRequest();
   private circuit: Circuit | null = null;
   private result: PathResult | null = null;
+  private pins: ReturnType<typeof pathPins> = [];
+  private loading = false;
   private root: HTMLElement;
   private onEvidence: (evidence: Explanation['evidence'] | null, reveal?: boolean) => void;
   constructor(root: HTMLElement, onEvidence: (evidence: Explanation['evidence'] | null, reveal?: boolean) => void) {
@@ -14,6 +16,7 @@ export class PathPanel {
     root.addEventListener('change', () => {
       this.request.cancel();
       this.result = null;
+      this.updateDestinations();
       this.renderState({ status: 'idle' });
       this.onEvidence(null);
     });
@@ -21,7 +24,7 @@ export class PathPanel {
       event.preventDefault();
       const form = event.target as HTMLFormElement;
       const data = new FormData(form);
-      if (!this.circuit || !data.get('from') || !data.get('to')) return;
+      if (!this.circuit || !data.get('from') || !data.get('to') || data.get('from') === data.get('to')) return;
       const [from_ref, from_pin] = JSON.parse(String(data.get('from')));
       const [to_ref, to_pin] = JSON.parse(String(data.get('to')));
       this.onEvidence(null);
@@ -42,21 +45,42 @@ export class PathPanel {
     this.request.cancel();
     this.circuit = circuit;
     this.result = null;
+    this.loading = false;
+    this.pins = circuit ? pathPins(circuit) : [];
     this.root.hidden = !circuit;
     if (!circuit) { this.root.innerHTML = ''; return; }
-    const options = '<option value="">Choose a pin…</option>' + pathPins(circuit).map(p => `<option value="${esc(p.value)}">${esc(p.label)}</option>`).join('');
+    const options = '<option value="">Choose a pin…</option>' + this.pins.map(p => `<option value="${esc(p.value)}">${esc(p.label)}</option>`).join('');
     this.root.innerHTML = `<details><summary>Trace a connection <span>Follow the route between two pins</span></summary>
       <form class="path-form"><label>From<select name="from" aria-label="Starting pin" required>${options}</select></label>
-      <label>To<select name="to" aria-label="Destination pin" required>${options}</select></label>
-      <button class="button primary" type="submit">Find route</button></form>
+      <label>To<select name="to" aria-label="Destination pin" aria-describedby="path-destination-hint" required disabled><option value="">Choose a starting pin first</option></select></label>
+      <button class="button primary" type="submit" disabled>Find route</button></form>
+      <label class="path-same-component" hidden><input type="checkbox" name="same-component"/> Show same component pins</label>
+      <p id="path-destination-hint" class="path-scope" hidden></p>
       <p class="path-scope">Follows wires and resistors. Other parts’ internal connections are not traced.</p>
       <div class="path-result" aria-live="polite"></div></details>`;
+  }
+  private updateDestinations() {
+    const from = this.root.querySelector<HTMLSelectElement>('[name="from"]')!;
+    const to = this.root.querySelector<HTMLSelectElement>('[name="to"]')!;
+    const same = this.root.querySelector<HTMLInputElement>('[name="same-component"]')!;
+    const selected = this.pins.find(pin => pin.value === from.value);
+    const available = selected ? this.pins.filter(pin => pin.value !== selected.value && (same.checked || pin.ref !== selected.ref)) : [];
+    const previous = to.value;
+    const placeholder = !selected ? 'Choose a starting pin first' : available.length ? 'Choose a pin…' : 'No destination pins available';
+    to.innerHTML = `<option value="">${placeholder}</option>` + available.map(pin => `<option value="${esc(pin.value)}">${esc(pin.label)}</option>`).join('');
+    to.value = available.some(pin => pin.value === previous) ? previous : '';
+    to.disabled = !available.length;
+    this.root.querySelector<HTMLElement>('.path-same-component')!.hidden = !selected;
+    const hint = this.root.querySelector<HTMLElement>('#path-destination-hint')!;
+    hint.hidden = !selected || !!available.length;
+    hint.textContent = same.checked ? 'This circuit has no other exported pins to select.' : 'No pins from other components. Enable “Show same component pins” to check another pin on this component.';
   }
   private renderState(state: PathState) {
     const output = this.root.querySelector<HTMLElement>('.path-result');
     if (!output) return;
     const button = this.root.querySelector<HTMLButtonElement>('[type="submit"]')!;
-    button.disabled = state.status === 'loading';
+    this.loading = state.status === 'loading';
+    button.disabled = this.loading || !this.root.querySelector<HTMLSelectElement>('[name="from"]')!.value || !this.root.querySelector<HTMLSelectElement>('[name="to"]')!.value;
     button.textContent = state.status === 'loading' ? 'Finding route…' : 'Find route';
     if (state.status === 'idle' || state.status === 'loading') { output.innerHTML = ''; return; }
     if (state.status === 'error') { output.innerHTML = `<p role="alert">${esc(state.message)}</p>`; return; }
