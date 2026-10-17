@@ -86,7 +86,7 @@ class ReviewIntegrationTests(unittest.TestCase):
                 self.assertEqual(finding['selection'], {'ref': 'CTRL7', 'pin': '03'})
                 self.assertEqual(finding['severity'], 'info')
                 self.assertEqual(finding['evidence']['paths'], [['c:CTRL7', 'p:["CTRL7","03"]']])
-                self.assertEqual(len(result['queries']), 4)  # No query per pin or net.
+                self.assertEqual(len(result['queries']), 5)  # No query per pin or net.
 
     def test_mutated_graph_is_reviewed_and_other_upload_is_unchanged(self):
         data = parse_netlist(generic_netlist('Arduino_UNO_R3'))

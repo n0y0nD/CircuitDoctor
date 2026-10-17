@@ -7,7 +7,7 @@ export interface Finding {
   title: string;
   message: string;
   suggestion: string;
-  selection: { net_code: string } | { ref: string; pin: string };
+  selection: { net_code: string } | { ref: string; pin: string } | { component_refs: string[] };
   evidence: Explanation['evidence'];
   sources?: { title: string; url: string }[];
 }
@@ -23,6 +23,7 @@ export interface Review {
     unverified_pins: { ref: string; pin: string; name: string; reason: string }[];
     skipped_pins: { ref: string; pin: string; reason: string }[];
   };
+  isolation?: { algorithm: string; group_count: number; separate_groups: number; board_refs: string[]; scope: string };
   summary: { components: number; nets: number; pins: number; warnings: number; information: number; marked_unused_pins: number; unknown_pin_names: number; unknown_pin_types: number };
   findings: Finding[];
   cannot_verify: { check: string; reason: string }[];

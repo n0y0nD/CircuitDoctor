@@ -417,10 +417,11 @@ function renderReview() {
   const warnings = result.findings.filter(f => f.severity === "warning");
   const information = result.findings.filter(f => f.severity === "info");
   const unconnected = information.filter(f => f.rule === "single_pin_net" || f.rule === "unassigned_pin");
-  const other = information.filter(f => !unconnected.includes(f));
+  const groups = information.filter(f => f.rule === "isolated_group");
+  const other = information.filter(f => !unconnected.includes(f) && !groups.includes(f));
   const required = result.requirements;
   const uncertainRequirements = (required?.unverified_pins.length || 0) + (required?.skipped_pins.length || 0);
-  const heading = result.status === "incomplete" ? "Not enough information to check this circuit" : warnings.length ? `${warnings.length} wiring problem${warnings.length === 1 ? "" : "s"} to check` : uncertainRequirements ? "Some power/ground connections need a closer look" : required?.checked_pins ? "No issues found in the supported wiring checks" : result.electrical.checked_nets ? "No Arduino power-wire conflicts found" : "No supported power connections to check";
+  const heading = result.status === "incomplete" ? "Not enough information to check this circuit" : warnings.length ? `${warnings.length} wiring problem${warnings.length === 1 ? "" : "s"} to check` : groups.length ? `${groups.length} separate group${groups.length === 1 ? "" : "s"} to check` : uncertainRequirements ? "Some power/ground connections need a closer look" : required?.checked_pins ? "No issues found in the supported wiring checks" : result.electrical.checked_nets ? "No Arduino power-wire conflicts found" : "No supported power connections to check";
   const connectionFor = (f: Finding) => {
     const selector = f.selection;
     const net = 'net_code' in selector ? circuit?.nets.find(n => n.code === selector.net_code) : null;
@@ -429,9 +430,11 @@ function renderReview() {
   panel.innerHTML = `<h3 class="review-summary">${esc(heading)}</h3>
     <p class="review-note">Checks Arduino power wiring and required power/GND pins for recognized parts. Other parts may need checks we cannot perform yet.</p>
     ${warnings.length ? `<div class="finding-list">${warnings.map(f => `<button class="finding-card warning" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(connectionFor(f))}</p>${f.rule.startsWith("required_") ? `<p>${esc(f.message)}</p>` : ""}<p><b>What to do:</b> ${esc(f.suggestion)}</p><small>Show this connection →</small></button>`).join("")}</div>` : ""}
+    ${groups.length ? `<div class="finding-list">${groups.map(f => `<button class="finding-card info" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(f.message)}</p><small>Show these parts →</small></button>`).join("")}</div>` : ""}
     ${unconnected.length ? `<details class="review-details"><summary>${unconnected.length} pins with no connection</summary><p>These may be intentional. Select a pin to check whether your design needs it.</p><div class="unconnected-list">${unconnected.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(connectionFor(f))}<span>Show pin →</span></button>`).join("")}</div></details>` : ""}
     <details class="review-details"><summary>Check details</summary>
       ${other.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(f.title)}<span>Show details →</span></button>`).join("")}
+      ${result.isolation ? `<p>${result.isolation.group_count} connected component group${result.isolation.group_count === 1 ? "" : "s"} found by FalkorDB. Grouping shows which parts share wiring; it does not prove electrical operation.</p>` : ""}
       <p>${result.summary.marked_unused_pins} pins marked intentionally unused in the file.</p>
       <p>${result.electrical.checked_nets} power/ground nets checked. ${esc(result.electrical.checks.join("; "))}.</p>
       ${result.electrical.recognized_parts.map(part => `<p><strong>${esc(part.ref)} · ${esc(part.name)}</strong></p>${sourceLinks(part.sources)}`).join("")}
@@ -453,10 +456,15 @@ function inspectFinding(id: string) {
   const finding = review.result.findings.find(f => f.id === id);
   if (!finding) return;
   const selector = finding.selection;
-  selectItem('net_code' in selector ? { kind: "net", id: selector.net_code } : {
+  selectItem('component_refs' in selector ? { kind: "component", id: selector.component_refs[0] } : 'net_code' in selector ? { kind: "net", id: selector.net_code } : {
     kind: "pin", id: `p:${JSON.stringify([selector.ref, selector.pin])}`, ref: selector.ref, pin: selector.pin,
   });
   selectedFinding = finding;
+  if (circuit && "component_refs" in selector) {
+    const visible = new Set(visibleNets(circuit, showUnused, selection).map(n => `n:${n.code}`));
+    if (finding.evidence.nodes.some(n => n.kind === "net" && !visible.has(n.id))) showUnused = true;
+    $<HTMLInputElement>("#unused-toggle").checked = showUnused;
+  }
   view = "graph";
   query = "";
   $<HTMLInputElement>("#search").value = "";

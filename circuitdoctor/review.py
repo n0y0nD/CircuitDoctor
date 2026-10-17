@@ -1,5 +1,6 @@
 """Source-backed, conservative wiring review without LLM verdicts."""
 
+from .isolation import isolated_groups
 from .parts import electrical_review
 from .requirements import required_connections
 from .tools import _known, _marked_unused, _pin_label, describe_connection
@@ -7,6 +8,7 @@ from .tools import _known, _marked_unused, _pin_label, describe_connection
 
 def check_rules(store, circuit_id):
     facts = store.review_facts(circuit_id)
+    isolation = isolated_groups(store, circuit_id, facts)
     required = required_connections(store, circuit_id, facts)
     required_missing = {(f['pin']['ref'], f['pin']['pin']) for f in required['findings']}
     findings = []
@@ -45,6 +47,9 @@ def check_rules(store, circuit_id):
         add(item['rule'], item['severity'], item['title'], item['message'], item['suggestion'], pin=item['pin'])
         findings[-1].update(evidence=item['evidence'], sources=item['sources'])
 
+    for item in isolation["findings"]:
+        findings.append({"id": f"finding-{len(findings) + 1}", **item})
+
     warning_count = sum(item["severity"] == "warning" for item in findings)
     empty = not facts["component_count"] or not facts["nets"]
     unknown_names = sum(not _known(pin["name"]) and not _known(pin["pinfunction"]) for pin in facts["pins"])
@@ -59,11 +64,11 @@ def check_rules(store, circuit_id):
     if empty:
         cannot_verify.insert(0, {"check": "Complete connectivity review", "reason": "This export has no components or no nets to review."})
     return {"tool": "check_rules", "source": "falkordb", "circuit_id": circuit_id,
-            "scope": "connectivity_and_board_rails", "electrical": electrical["coverage"], "requirements": required["coverage"], "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
+            "scope": "connectivity_and_board_rails", "electrical": electrical["coverage"], "requirements": required["coverage"], "isolation": isolation["coverage"], "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
             "summary": {"components": facts["component_count"], "nets": len(facts["nets"]),
                         "pins": len(facts["pins"]), "warnings": warning_count,
                         "information": len(findings) - warning_count, "marked_unused_pins": unused,
                         "unknown_pin_names": unknown_names, "unknown_pin_types": unknown_types},
-            "findings": findings, "cannot_verify": cannot_verify, "queries": facts["queries"] + required["queries"],
+            "findings": findings, "cannot_verify": cannot_verify, "queries": facts["queries"] + isolation["queries"] + required["queries"],
             "limitations": ["Connectivity, limited board rails and catalog-listed required supply pins only. No warnings does not mean the circuit is electrically correct.",
                             "Unused markers are read from pin metadata, not inferred from net names."]}

@@ -27,6 +27,10 @@ Exported pin IDs differ from Arduino labels: use the exact IDs in circuit_overvi
 Use explain_net to inspect wiring, check_rules for review (including required catalog power/GND
 pins), trace_power for direct known board rails. Required-pin checks cover only exact supported
 part identities and consistent pin metadata. Unverified external supply paths are not faults.
+Use check_rules to find separate component groups computed by FalkorDB algo.WCC.
+These groups use HAS_PIN and ON_NET for structural grouping, including shared ground;
+they do not imply conduction through a part. Separate groups can be intentional.
+Without an identified board, no group is assumed to be the main circuit.
 A connected required pin is not proof of correct voltage or a powered, working part.
 Use find_path for routes between two exact exported pins. It follows wires and known resistors
 only, up to 32 graph steps. A missing route is not proof of a fault: other component internals
@@ -118,7 +122,7 @@ TOOLS = [
     {'name': 'find_path', 'description': 'Find a bounded connection route between two pins using FalkorDB shortestPath. Wires and recognized two-pin resistors only; not current flow or a fault diagnosis.', 'parameters': PATH_SELECTOR},
     {'name': 'circuit_overview', 'description': 'List components, net codes, exact exported pin IDs and names from the current circuit.', 'parameters': {'type': 'OBJECT', 'properties': {}}},
     {'name': 'explain_net', 'description': 'Read exact graph connections. Supply only net_code, only net_name, or both ref and pin.', 'parameters': SELECTOR},
-    {'name': 'check_rules', 'description': 'Review connectivity, Arduino board rails and catalog-listed required power/GND pins. Read requirements coverage; unknown parts and external supply paths may be unverified. Not a full electrical diagnosis.', 'parameters': {'type': 'OBJECT', 'properties': {}}},
+    {'name': 'check_rules', 'description': 'Review disconnected component groups with FalkorDB WCC, connectivity, Arduino board rails and catalog-listed required power/GND pins. Read requirements coverage; unknown parts and external supply paths may be unverified. Not a full electrical diagnosis.', 'parameters': {'type': 'OBJECT', 'properties': {}}},
     {'name': 'trace_power', 'description': 'Trace a direct known Arduino board power rail. Same selector as explain_net. Does not traverse parts or shared ground.', 'parameters': SELECTOR},
 ]
 

@@ -88,6 +88,13 @@ the host port in `compose.yaml`. Website: 8080; database: 6379; database viewer:
   Searches stop at 32 graph edges with a five-second query timeout. No route is
   not a fault verdict, and a route does not prove current flow or operation.
   Existing saved graphs are enriched when tracing, without changing the export.
+- **Separate groups:** review runs FalkorDB `algo.WCC` on `Component`, `Pin`
+  and `Net` nodes using `HAS_PIN` / `ON_NET`. Groups without an identified
+  Arduino are shown as information with whole-group highlighting. Without a
+  supported board, separate groups are reported without choosing a main group.
+  This is structural grouping, not conduction or power-dependency analysis;
+  intentional isolated circuits are not declared faulty. Gemini can inspect
+  the groups through `check_rules`.
 - Gemini calls `circuit_overview`, `explain_net`, `check_rules`, `trace_power`
   and `find_path`.
   Responses expose their graph evidence and queries; supported evidence can be
