@@ -29,7 +29,7 @@ def branching_circuit(part='Arduino_UNO_R3'):
 
 class PowerApiValidationTests(unittest.TestCase):
     def test_invalid_selectors_and_database_outage(self):
-        with TestClient(app) as client, patch('circuitdoctor.api.get_store') as store:
+        with patch('circuitdoctor.api.migrate_saved_paths'), TestClient(app) as client, patch('circuitdoctor.api.get_store') as store:
             for selector in ({}, {'ref': 'A'}, {'net_code': '1', 'pin': '2'}, {'net_code': ''}, {'unexpected': '1'}):
                 self.assertEqual(client.post('/api/circuits/id/power-trace', json=selector).status_code, 422)
             store.assert_not_called()

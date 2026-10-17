@@ -1,6 +1,6 @@
 """Store independent circuit graphs and reconstruct connectivity with Cypher.
 
-The loader stores imports; path tracing adds derived resistor THROUGH edges.
+The loader stores imports and derived resistor THROUGH edges before marking them ready.
 Reads follow HAS_PIN / ON_NET relationships; they never
 return a cached parser result. Library metadata is preserved separately and is
 not treated as evidence that a pin is connected.
@@ -18,6 +18,8 @@ from falkordb import FalkorDB
 from redis.exceptions import RedisError
 from redis.backoff import NoBackoff
 from redis.retry import Retry
+
+from .path_model import PATH_MODEL_VERSION, RESISTOR_QUERY, resistor_rows
 
 LOG = logging.getLogger(__name__)
 PREFIX = "circuitdoctor_"
@@ -134,8 +136,10 @@ class CircuitStore:
                                 list(pins.values()))
             self._write_batches(graph, "UNWIND $rows AS r MATCH (p:Pin {id:r.id}), (n:Net {code:r.code}) "
                                 "CREATE (p)-[:ON_NET {position:r.position}]->(n)", memberships)
-            # Incomplete graphs are never returned by read().
-            graph.query("MATCH (m:Circuit) SET m.ready=true")
+            self._write_batches(graph, RESISTOR_QUERY, resistor_rows(circuit['components'], pins))
+            # Publish only after both the original wiring and derived paths exist.
+            graph.query("MATCH (m:Circuit) SET m.path_model_version=$version, m.ready=true",
+                        {"version": PATH_MODEL_VERSION})
         except RedisError as exc:
             # Only this request's UUID graph is eligible for cleanup.
             try:
@@ -144,6 +148,37 @@ class CircuitStore:
                 LOG.warning("Could not clean incomplete graph %s", graph_name)
             raise StorageUnavailable("Could not save circuit to FalkorDB. Please try again.") from exc
         return {"circuit_id": circuit_id, "graph_name": graph_name}
+
+    def migrate_path_models(self):
+        """Upgrade ready legacy imports at startup, never during a route request.
+
+        Only this application's UUID graphs with matching Circuit metadata qualify.
+        MERGE makes interrupted/concurrent upgrades safe to retry; the version is
+        set only after every batch succeeds. Original wiring is never modified.
+        """
+        migrated = 0
+        try:
+            for name in self.db.list_graphs():
+                if not isinstance(name, str) or not re.fullmatch(PREFIX + r"[0-9a-f]{32}", name):
+                    continue
+                cid = name[len(PREFIX):]
+                graph = self.db.select_graph(name)
+                rows = graph.ro_query(
+                    "MATCH (m:Circuit {id:$id,ready:true}) RETURN m.path_model_version",
+                    {"id": cid}, timeout=10000).result_set
+                if not rows or rows[0][0] == PATH_MODEL_VERSION:
+                    continue
+                if rows[0][0] is not None:
+                    raise StorageUnavailable("Saved circuit uses an unsupported connection model.")
+                facts = self.review_facts(cid)
+                links = resistor_rows(facts['components'], ((p['ref'], p['pin']) for p in facts['pins']))
+                self._write_batches(graph, RESISTOR_QUERY, links)
+                graph.query("MATCH (m:Circuit {id:$id,ready:true}) SET m.path_model_version=$version",
+                            {"id": cid, "version": PATH_MODEL_VERSION}, timeout=10000)
+                migrated += 1
+        except RedisError as exc:
+            raise StorageUnavailable("Could not prepare saved connection paths. Restart the app to retry.") from exc
+        return migrated
 
     def read(self, circuit_id):
         name = self.graph_name(circuit_id)

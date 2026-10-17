@@ -1,5 +1,7 @@
 """Local netlist upload, FalkorDB storage and workspace API."""
 
+from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 from typing import Literal
 
@@ -19,7 +21,24 @@ from .paths import find_path
 from .chat import ask_circuit, chat_status, ChatError, CHAT_LOCK
 
 ROOT = Path(__file__).resolve().parents[1]
-app = FastAPI(title="CircuitDoctor workspace")
+
+
+def migrate_saved_paths():
+    return get_store().migrate_path_models()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    try:
+        await run_in_threadpool(migrate_saved_paths)
+    except StorageUnavailable:
+        # Upload/review remain available; legacy paths fail explicitly rather
+        # than reporting a false "no route". Restart retries interrupted work.
+        logging.getLogger(__name__).exception("Saved connection path preparation failed")
+    yield
+
+
+app = FastAPI(title="CircuitDoctor workspace", lifespan=lifespan)
 
 
 @app.exception_handler(StorageUnavailable)

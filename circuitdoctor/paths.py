@@ -10,15 +10,12 @@ from redis.exceptions import RedisError
 
 from .storage import ConnectionNotFound, StorageUnavailable, _json
 from .tools import _identifier, _pin_label
+from .path_model import PATH_MODEL_VERSION
 
 MAX_HOPS = 32
 PATH_QUERY = f"""MATCH (a:Pin {{id:$start}}),(b:Pin {{id:$end}})
 WITH shortestPath((a)-[:ON_NET|THROUGH*0..{MAX_HOPS}]-(b)) AS route
 RETURN nodes(route), relationships(route)"""
-RESISTOR_QUERY = """UNWIND $rows AS r
-MATCH (a:Pin {id:r.start}), (b:Pin {id:r.end})
-MERGE (a)-[e:THROUGH]->(b)
-SET e.ref=r.ref, e.model='two_terminal_resistor_v1'"""
 LIMITATION = ("Follows wires and two-pin Device:R / Device:R_Small resistors only, "
               f"up to {MAX_HOPS} graph steps. Other component internals are not traced. "
               "A route does not prove current flow or that the circuit works.")
@@ -35,26 +32,14 @@ def find_path(store, circuit_id, *, from_ref, from_pin, to_ref, to_pin):
     if start not in pins or end not in pins:
         raise ConnectionNotFound('One of those pins is not present in this circuit.')
     components = {c['ref']: c for c in facts['components']}
-    per_component = {}
-    for ref, number in pins:
-        per_component.setdefault(ref, []).append(number)
-    resistors = []
-    for ref, component in components.items():
-        source = component['libsource']
-        numbers = sorted(per_component.get(ref, []))
-        if source == {'lib': 'Device', 'part': 'R'} or source == {'lib': 'Device', 'part': 'R_Small'}:
-            if len(numbers) == 2:
-                resistors.append({'ref': ref, 'start': _json([ref, numbers[0]]),
-                                  'end': _json([ref, numbers[1]])})
     graph = store.db.select_graph(facts['graph_name'])
     parameters = {'start': _json(list(start)), 'end': _json(list(end))}
     queries = []
     try:
-        # Idempotent enrichment also supports circuits imported before this feature.
-        # Circuit metadata is immutable through the application API.
-        store._write_batches(graph, RESISTOR_QUERY, resistors)
-        if resistors:
-            queries.append({'cypher': RESISTOR_QUERY, 'parameters': {'rows': resistors}, 'purpose': 'Resistor connection model'})
+        model = graph.ro_query("MATCH (m:Circuit {id:$id,ready:true}) RETURN m.path_model_version",
+                               {'id': circuit_id}, timeout=5000).result_set
+        if not model or model[0][0] != PATH_MODEL_VERSION:
+            raise StorageUnavailable('Saved connection paths need preparation. Restart the app and try again.')
         rows = graph.ro_query(PATH_QUERY, parameters, timeout=5000).result_set
     except RedisError as exc:
         raise StorageUnavailable('Could not trace the connection in FalkorDB. Please try again.') from exc

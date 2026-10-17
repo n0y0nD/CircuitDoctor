@@ -15,7 +15,7 @@ from test_storage import generic_netlist
 
 class ReviewFailureTests(unittest.TestCase):
     def test_database_failure_is_not_a_successful_empty_review(self):
-        with TestClient(app) as client, patch('circuitdoctor.api.get_store', side_effect=StorageUnavailable('offline')):
+        with patch('circuitdoctor.api.migrate_saved_paths'), TestClient(app) as client, patch('circuitdoctor.api.get_store', side_effect=StorageUnavailable('offline')):
             response = client.post(f'/api/circuits/{"a" * 32}/review')
         self.assertEqual(response.status_code, 503)
         self.assertNotIn('findings', response.json())

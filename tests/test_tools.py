@@ -32,7 +32,7 @@ class ExplainValidationTests(unittest.TestCase):
         store.connection_facts.assert_not_called()
 
     def test_tool_reports_database_outage_without_fallback(self):
-        with TestClient(app) as client, patch("circuitdoctor.api.get_store", side_effect=StorageUnavailable("offline")):
+        with patch('circuitdoctor.api.migrate_saved_paths'), TestClient(app) as client, patch("circuitdoctor.api.get_store", side_effect=StorageUnavailable("offline")):
             response = client.post(f'/api/circuits/{"a" * 32}/explain', json={"net_code": "1"})
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("summary", response.json())

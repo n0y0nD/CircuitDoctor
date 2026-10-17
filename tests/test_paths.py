@@ -2,6 +2,7 @@
 import os
 import unittest
 from unittest.mock import patch
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from redis.exceptions import ResponseError
@@ -11,6 +12,7 @@ from circuitdoctor.chat import execute_tool, ask_circuit
 from circuitdoctor.parser import parse_netlist
 from circuitdoctor.paths import find_path, MAX_HOPS
 from circuitdoctor.storage import get_store, ConnectionNotFound, StorageUnavailable
+from circuitdoctor.path_model import PATH_MODEL_VERSION, RESISTOR_QUERY
 
 
 def circuit_text(part='R', lib='Device', extra_pin=False):
@@ -66,7 +68,90 @@ class PathTests(unittest.TestCase):
         reverse = self.route(cid, ('MODULEΩ', 'VCC'), ('BOARD9', '007'))
         self.assertEqual(reverse['evidence']['paths'][0], list(reversed(result['evidence']['paths'][0])))
         self.assertEqual(graph.ro_query('MATCH ()-[e:THROUGH]->() RETURN count(e)').result_set[0][0], 2)
-        self.assertEqual(self.store.read(cid), before)  # Original export unchanged; old imports also work.
+        self.assertEqual(self.store.read(cid), before)  # Original exported wiring is unchanged.
+
+    def test_upload_prepares_links_and_all_route_requests_are_read_only(self):
+        cid, graph = self.own()
+        self.assertEqual(graph.ro_query('MATCH ()-[e:THROUGH]->() RETURN count(e)').result_set, [[2]])
+        self.assertEqual(graph.ro_query('MATCH (m:Circuit) RETURN m.path_model_version').result_set,
+                         [[PATH_MODEL_VERSION]])
+        args = {'from_ref': 'BOARD9', 'from_pin': '007', 'to_ref': 'MODULEΩ', 'to_pin': 'VCC'}
+        with patch.object(self.store.db, 'select_graph', return_value=graph), \
+             patch.object(graph, 'query', side_effect=AssertionError('route attempted a write')), \
+             patch.object(self.store, '_write_batches', side_effect=AssertionError('route attempted a batch')):
+            for _ in range(2):
+                self.assertEqual(self.client.post(f'/api/circuits/{cid}/path', json=args).json()['status'], 'found')
+                result = execute_tool(self.store, cid, 'find_path', args)
+                self.assertEqual(result['status'], 'found')
+                self.assertEqual(len(result['queries']), 1)
+                self.assertIn('shortestPath', result['queries'][0]['cypher'])
+
+    def test_failed_path_preparation_does_not_publish_partial_upload(self):
+        cid = uuid4().hex
+        class FixedId:
+            hex = cid
+        original_write = self.store._write_batches
+        def fail_links(graph, query, rows):
+            if query == RESISTOR_QUERY:
+                raise ResponseError('path creation failed')
+            return original_write(graph, query, rows)
+        with patch('circuitdoctor.storage.uuid4', return_value=FixedId()), \
+             patch.object(self.store, '_write_batches', side_effect=fail_links):
+            with self.assertRaises(StorageUnavailable):
+                self.store.save(parse_netlist(circuit_text()))
+        self.assertFalse(self.store.db.connection.exists(self.store.graph_name(cid)))
+
+    def test_legacy_migration_is_idempotent_and_preserves_original_wiring(self):
+        cid, graph = self.own()
+        before = self.store.read(cid)
+        # Simulate a legacy import whose earlier tracer added only one link.
+        graph.query("MATCH ()-[e:THROUGH {ref:'Z23'}]->() DELETE e")
+        graph.query('MATCH (m:Circuit) REMOVE m.path_model_version')
+        with self.assertRaises(StorageUnavailable):
+            self.route(cid)  # Never invent a no-route result for unprepared data.
+        with patch.object(self.store.db, 'list_graphs', return_value=[graph.name]):
+            self.assertEqual(self.store.migrate_path_models(), 1)
+            with patch.object(self.store, '_write_batches', side_effect=AssertionError('already prepared')):
+                self.assertEqual(self.store.migrate_path_models(), 0)
+        self.assertEqual(self.route(cid)['status'], 'found')
+        self.assertEqual(graph.ro_query('MATCH ()-[e:THROUGH]->() RETURN count(e)').result_set, [[2]])
+        self.assertEqual(self.store.read(cid), before)
+
+    def test_interrupted_migration_keeps_version_unset_and_can_retry(self):
+        cid, graph = self.own()
+        graph.query('MATCH ()-[e:THROUGH]->() DELETE e')
+        graph.query('MATCH (m:Circuit) REMOVE m.path_model_version')
+        def partial_write(target, query, rows):
+            target.query(query, {'rows': rows[:1]})
+            raise ResponseError('interrupted batch')
+        with patch.object(self.store.db, 'list_graphs', return_value=[graph.name]):
+            with patch.object(self.store, '_write_batches', side_effect=partial_write), self.assertRaises(StorageUnavailable):
+                self.store.migrate_path_models()
+            self.assertEqual(graph.ro_query('MATCH (m:Circuit) RETURN m.path_model_version').result_set, [[None]])
+            with self.assertRaises(StorageUnavailable):
+                self.route(cid)
+            self.assertEqual(self.store.migrate_path_models(), 1)
+        self.assertEqual(self.route(cid)['status'], 'found')
+        self.assertEqual(graph.ro_query('MATCH ()-[e:THROUGH]->() RETURN count(e)').result_set, [[2]])
+
+    def test_migration_skips_unrelated_and_incomplete_graphs(self):
+        cid, graph = self.own()
+        graph.query('MATCH (m:Circuit) REMOVE m.path_model_version SET m.ready=false')
+        with patch.object(self.store.db, 'list_graphs', return_value=['other_graph', 'circuitdoctor_demo', graph.name]), \
+             patch.object(self.store, '_write_batches', side_effect=AssertionError('must not write')):
+            self.assertEqual(self.store.migrate_path_models(), 0)
+        graph.query("MATCH (m:Circuit) SET m.ready=true, m.id='another-owner'")
+        with patch.object(self.store.db, 'list_graphs', return_value=[graph.name]), \
+             patch.object(self.store, '_write_batches', side_effect=AssertionError('must not write')):
+            self.assertEqual(self.store.migrate_path_models(), 0)
+
+    def test_legacy_circuit_without_resistors_is_prepared_once(self):
+        cid, graph = self.own('(export (components (comp (ref X) (value unknown))) (nets (net (code 1) (name wire) (node (ref X) (pin A)) (node (ref X) (pin B)))))')
+        graph.query('MATCH (m:Circuit) REMOVE m.path_model_version')
+        with patch.object(self.store.db, 'list_graphs', return_value=[graph.name]):
+            self.assertEqual(self.store.migrate_path_models(), 1)
+            self.assertEqual(self.store.migrate_path_models(), 0)
+        self.assertEqual(self.route(cid, ('X', 'A'), ('X', 'B'))['status'], 'found')
 
     def test_no_internal_mcu_display_or_unknown_part_shortcuts(self):
         cid, _ = self.own()
@@ -108,7 +193,13 @@ class PathTests(unittest.TestCase):
             self.assertEqual(self.client.post(f'/api/circuits/{cid}/path', json=changed).status_code, 404)
         for changed in [dict(args, max_hops=999), dict(args, from_pin=''), dict(args, from_pin=7)]:
             self.assertEqual(self.client.post(f'/api/circuits/{cid}/path', json=changed).status_code, 422)
-        with patch.object(self.store, '_write_batches', side_effect=ResponseError('timeout')):
+        graph = self.store.db.select_graph(self.store.graph_name(cid))
+        original_read = graph.ro_query
+        def fail_path(query, *args, **kwargs):
+            if 'shortestPath' in query:
+                raise ResponseError('timeout')
+            return original_read(query, *args, **kwargs)
+        with patch.object(self.store.db, 'select_graph', return_value=graph), patch.object(graph, 'ro_query', side_effect=fail_path):
             self.assertEqual(self.client.post(f'/api/circuits/{cid}/path', json=args).status_code, 503)
         with self.assertRaises(ValueError):
             execute_tool(self.store, cid, 'find_path', dict(args, circuit_id=other))
@@ -135,3 +226,17 @@ class PathTests(unittest.TestCase):
         self.assertEqual(result['tool_calls'], 1)
         self.assertEqual(result['evidence'][2]['tool'], 'find_path')
         self.assertEqual(result['evidence'][2]['result']['status'], 'found')
+
+class PathStartupTests(unittest.TestCase):
+    def test_startup_prepares_saved_paths_once(self):
+        with patch('circuitdoctor.api.get_store') as get_store:
+            with TestClient(app):
+                get_store.return_value.migrate_path_models.assert_called_once_with()
+            get_store.return_value.migrate_path_models.assert_called_once_with()
+
+    def test_failed_startup_preparation_does_not_disable_other_endpoints(self):
+        with patch('circuitdoctor.api.get_store') as get_store:
+            get_store.return_value.migrate_path_models.side_effect = StorageUnavailable('offline')
+            get_store.return_value.available.return_value = False
+            with self.assertLogs('circuitdoctor.api', level='ERROR'), TestClient(app) as client:
+                self.assertEqual(client.get('/api/status').status_code, 200)

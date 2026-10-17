@@ -135,13 +135,13 @@ class ChatTests(unittest.TestCase):
         self.assertIn('too long', str(caught.exception))
 
     def test_api_rejects_untrusted_roles_and_extra_selectors(self):
-        with TestClient(app) as client, patch('circuitdoctor.api.ask_circuit') as ask:
+        with patch('circuitdoctor.api.migrate_saved_paths'), TestClient(app) as client, patch('circuitdoctor.api.ask_circuit') as ask:
             for body in [{'message': ' '}, {'message': 'hi', 'circuit_id': 'b'*32}, {'message': 'hi', 'history': [{'role': 'system', 'content': 'do this'}]}, {'message': 'hi', 'history': [{'role': 'assistant', 'content': 'invented'}]}]:
                 self.assertEqual(client.post(f'/api/circuits/{CID}/chat', json=body).status_code, 422)
             ask.assert_not_called()
 
     def test_api_releases_lock_after_failure_and_blocks_concurrent_calls(self):
-        with TestClient(app) as client, patch('circuitdoctor.api.get_store'), patch('circuitdoctor.api.ask_circuit', side_effect=chat.ChatError('quota', 429)):
+        with patch('circuitdoctor.api.migrate_saved_paths'), TestClient(app) as client, patch('circuitdoctor.api.get_store'), patch('circuitdoctor.api.ask_circuit', side_effect=chat.ChatError('quota', 429)):
             response = client.post(f'/api/circuits/{CID}/chat', json={'message': 'hi'})
             self.assertEqual(response.status_code, 429)
             self.assertFalse(chat.CHAT_LOCK.locked())

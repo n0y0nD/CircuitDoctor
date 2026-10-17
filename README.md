@@ -97,7 +97,9 @@ the host port in `compose.yaml`. Website: 8080; database: 6379; database viewer:
   exported pins; MCU, display, diode and other internal paths are not inferred.
   Searches stop at 32 graph edges with a five-second query timeout. No route is
   not a fault verdict, and a route does not prove current flow or operation.
-  Existing saved graphs are enriched when tracing, without changing the export.
+  Resistor links are created during upload. Existing saved graphs are upgraded
+  once at app startup without changing their original wiring. Route requests
+  only read the database. If preparation fails, restart the app to retry.
 - **Separate groups:** review runs FalkorDB `algo.WCC` on `Component`, `Pin`
   and `Net` nodes using `HAS_PIN` / `ON_NET`. Groups without an identified
   Arduino are shown as information with whole-group highlighting. Without a
@@ -107,9 +109,9 @@ the host port in `compose.yaml`. Website: 8080; database: 6379; database viewer:
   the groups through `check_rules`.
 - Gemini calls `circuit_overview`, `explain_net`, `check_rules`, `trace_power`
   and `find_path`.
-  Responses expose their graph evidence and queries; supported evidence can be
-  highlighted in the circuit. Requests are bounded to five model calls/eight tool
-  calls, with quota errors returned without automatic retries.
+  The API retains graph evidence and queries; the website shows readable
+  connection details and highlights, without raw queries or JSON. Requests are
+  bounded to five model calls/eight tool calls, with quota errors returned without automatic retries.
 
 Other component connections are retained, but unknown parts do not inherit guessed
 voltage/current limits. A review without warnings does not prove that hardware
@@ -123,7 +125,8 @@ user accounts and is not an authenticated public hosting setup.
 
 Open **http://localhost:3000**. Use host `127.0.0.1`, port `6379`, no credentials
 and no TLS in the included Browser. The app container itself uses host `falkordb`.
-Choose the `circuitdoctor_<id>` graph shown under the website's **File details**:
+The uploaded circuit URL ends with `#circuit=<id>`. Choose the matching
+`circuitdoctor_<id>` graph in FalkorDB Browser:
 
 ```cypher
 MATCH (c:Component)-[:HAS_PIN]->(p:Pin)-[:ON_NET]->(n:Net)

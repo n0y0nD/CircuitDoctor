@@ -26,7 +26,7 @@ def reply(parts):
 class UploadedCircuitWorkflowTests(unittest.TestCase):
     def test_kicad_uno_and_nano_normal_and_short_circuits(self):
         store = get_store()
-        with TestClient(app) as client:
+        with patch('circuitdoctor.api.migrate_saved_paths'), TestClient(app) as client:
             for filename in ('uno_normal.net', 'uno_short.net', 'nano_normal.net', 'nano_short.net'):
                 file = FIXTURES / filename
                 with self.subTest(file=file.name):
