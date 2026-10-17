@@ -24,7 +24,6 @@ export interface Circuit {
     circuit_id: string;
     graph_name: string;
     filename: string;
-    sample: string;
     pins: number;
     connections: number;
     query: string;

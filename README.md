@@ -181,8 +181,8 @@ chat tests mock the external model while exercising its tool calls; they do not
 spend Gemini quota.
 
 `tests/fixtures/kicad/` contains KiCad-exported Uno/Nano normal and shorted wiring
-for regression checks. The original LED fixtures and editable source files are
-in `samples/`. Test files are not shown as examples in the website.
+for automated regression checks only. The application processes uploaded `.net`
+files and does not bundle example circuits.
 
 The parser also runs without a database:
 
@@ -193,7 +193,7 @@ python -m circuitdoctor path/to/circuit.net --json
 ## API
 
 - `GET /api/status`: database readiness.
-- `POST /api/circuits?filename=example.net`: upload raw UTF-8 `.net` bytes.
+- `POST /api/circuits?filename=circuit.net`: upload raw UTF-8 `.net` bytes.
 - `GET /api/circuits/{id}`: read the saved circuit.
 - `POST /api/circuits/{id}/review`: deterministic connectivity and board-rail checks.
 - `POST /api/circuits/{id}/explain`: inspect a connection.

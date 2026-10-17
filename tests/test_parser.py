@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Format-only Nano fixture, not a hardware design or a diagnostic claim.
 # Nano v3.x names/numbers checked against KiCad 10.0.7's MCU_Module symbol:
-# D5=8; GND=4,29. Different refs, pins and nets prevent dependence on the Uno LED.
+# D5=8; GND=4,29. Different refs, pins and nets exercise board-independent parsing.
 NANO = '''(export (version E)
   (components
     (comp (ref CTRL7) (value Arduino_Nano_v3.x)
@@ -39,48 +39,42 @@ def pin_map(circuit):
             for net in circuit["nets"] for node in net["nodes"]}
 
 
-class SampleTests(unittest.TestCase):
-    def test_original_uno_export(self):
-        circuit = load_netlist(ROOT / "samples/clean.net")
+class ExportTests(unittest.TestCase):
+    def test_real_uno_export(self):
+        circuit = load_netlist(ROOT / "tests/fixtures/kicad/uno_normal.net")
         self.assertEqual({c["ref"]: c["value"] for c in circuit["components"]},
-                         {"A1": "Arduino_UNO_R3", "R1": "330", "D1": "Red LED"})
+                         {"A7": "Arduino_UNO_R3", "R12": "1000", "J9": "Unspecified external load"})
         self.assertEqual(len(circuit["nets"]), 31)
         self.assertEqual(len(pin_map(circuit)), 36)
         connected = {n["name"]: {(p["ref"], p["pin"]) for p in n["nodes"]}
                      for n in circuit["nets"] if len(n["nodes"]) > 1}
         self.assertEqual(connected, {
-            "/GND": {("A1", "6"), ("A1", "7"), ("A1", "29"), ("D1", "1")},
-            "/LED_CONTROL": {("A1", "28"), ("R1", "1")},
-            "/LED_ANODE": {("R1", "2"), ("D1", "2")},
+            "/RETURN": {("A7", "6"), ("A7", "7"), ("A7", "29"), ("J9", "2")},
+            "/SUPPLY": {("A7", "5"), ("R12", "1")},
+            "/LOAD_INPUT": {("R12", "2"), ("J9", "1")},
         })
         uno = next(p for p in circuit["libparts"] if p["part"] == "Arduino_UNO_R3")
         self.assertEqual(len(uno["pins"]), 32)
         self.assertEqual(next(p["name"] for p in uno["pins"] if p["num"] == "28"), "D13")
         self.assertEqual(json.loads(json.dumps(circuit)), circuit)
 
-    def test_missing_ground_differs_only_at_led_cathode(self):
-        clean = load_netlist(ROOT / "samples/clean.net")
-        faulty = load_netlist(ROOT / "samples/missing_ground.net")
-        before, after = pin_map(clean), pin_map(faulty)
-        self.assertEqual(before.keys(), after.keys())
-        self.assertEqual({pin for pin in before if before[pin] != after[pin]}, {("D1", "1")})
-        self.assertEqual(len(faulty["nets"]), 32)
-        floating = next(n for n in faulty["nets"] if n["name"] == after[("D1", "1")])
-        self.assertEqual(len(floating["nodes"]), 1)
-        self.assertNotIn("no_connect", floating["nodes"][0]["pintype"])
-        intentional = [n for n in faulty["nets"] if len(n["nodes"]) == 1
-                       and "no_connect" in n["nodes"][0]["pintype"]]
-        self.assertEqual(len(intentional), 28)
+    def test_disconnected_pin_stays_distinct_from_intentionally_unused_pin(self):
+        circuit = parse_netlist('''(export (components (comp (ref X9) (value Connector)))
+          (nets (net (code 1) (name loose) (node (ref X9) (pin 01) (pintype passive)))
+                (net (code 2) (name unused) (node (ref X9) (pin 02) (pintype "passive+no_connect")))))''')
+        self.assertNotIn("no_connect", circuit["nets"][0]["nodes"][0]["pintype"])
+        self.assertIn("no_connect", circuit["nets"][1]["nodes"][0]["pintype"])
+        self.assertEqual(pin_map(circuit), {("X9", "01"): "loose", ("X9", "02"): "unused"})
 
     def test_reference_names_are_not_fixed(self):
-        text = (ROOT / "samples/clean.net").read_text()
-        text = text.replace('(ref "A1")', '(ref "BOARD42")')
-        text = text.replace('(ref "R1")', '(ref "R87")')
-        text = text.replace('"/LED_CONTROL"', '"/other_sheet/output"')
+        text = (ROOT / "tests/fixtures/kicad/uno_normal.net").read_text()
+        text = text.replace('(ref "A7")', '(ref "BOARD42")')
+        text = text.replace('(ref "R12")', '(ref "R87")')
+        text = text.replace('"/SUPPLY"', '"/other_sheet/output"')
         circuit = parse_netlist(text)
-        self.assertEqual(pin_map(circuit)[("BOARD42", "28")], "/other_sheet/output")
+        self.assertEqual(pin_map(circuit)[("BOARD42", "5")], "/other_sheet/output")
         self.assertEqual(pin_map(circuit)[("R87", "1")], "/other_sheet/output")
-        self.assertNotIn("A1", {c["ref"] for c in circuit["components"]})
+        self.assertNotIn("A7", {c["ref"] for c in circuit["components"]})
 
     def test_nano_uses_exported_pins_without_uno_mapping(self):
         circuit = parse_netlist(NANO)
@@ -168,7 +162,7 @@ class FormatTests(unittest.TestCase):
             with self.assertRaisesRegex(NetlistParseError, "input limit"):
                 parse_netlist(NANO)
             with self.assertRaisesRegex(NetlistParseError, "input limit"):
-                load_netlist(ROOT / "samples/clean.net")
+                load_netlist(ROOT / "tests/fixtures/kicad/uno_normal.net")
         with self.assertRaises(NetlistParseError):
             parse_netlist("(" * 2000 + ")" * 2000)
 
@@ -179,14 +173,14 @@ class CommandTests(unittest.TestCase):
                               cwd=ROOT, capture_output=True, text=True, timeout=10)
 
     def test_json_and_human_readable_output(self):
-        result = self.run_cli("samples/clean.net", "--json")
+        result = self.run_cli("tests/fixtures/kicad/uno_normal.net", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout), load_netlist(ROOT / "samples/clean.net"))
-        result = self.run_cli("samples/missing_ground.net")
+        self.assertEqual(json.loads(result.stdout), load_netlist(ROOT / "tests/fixtures/kicad/uno_normal.net"))
+        result = self.run_cli("tests/fixtures/kicad/uno_normal.net")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Components (3)", result.stdout)
-        self.assertIn("Nets (32)", result.stdout)
-        self.assertIn("D1.1", result.stdout)
+        self.assertIn("Nets (31)", result.stdout)
+        self.assertIn("J9.1", result.stdout)
 
     def test_errors_have_nonzero_exit_without_partial_json(self):
         with tempfile.TemporaryDirectory() as directory:

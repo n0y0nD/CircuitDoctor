@@ -55,14 +55,15 @@ class FalkorDBIntegrationTests(unittest.TestCase):
         return receipt["circuit_id"]
 
     def test_existing_exports_round_trip_without_losing_metadata(self):
-        for filename in ("clean.net", "missing_ground.net"):
+        for filename in ("uno_normal.net", "nano_normal.net"):
             with self.subTest(filename=filename):
-                original = load_netlist(ROOT / "samples" / filename)
+                original = load_netlist(ROOT / "tests/fixtures/kicad" / filename)
                 cid = self.own(self.store.save(original, filename=filename))
                 restored = self.store.read(cid)
                 storage = restored.pop("storage")
                 self.assertEqual(restored, original)
-                self.assertEqual(storage["connections"], 36)
+                self.assertEqual(storage["connections"], sum(len(n["nodes"]) for n in original["nets"]))
+                self.assertNotIn("sample", storage)
 
     def test_generic_uno_and_nano_uploads_are_isolated_and_persistent(self):
         ids = []
@@ -111,16 +112,22 @@ class FalkorDBIntegrationTests(unittest.TestCase):
                 self.store.save(parse_netlist(generic_netlist("Arduino_UNO_R3")))
         self.assertFalse(self.store.db.connection.exists(self.store.graph_name(cid)))
 
-    def test_unknown_ids_do_not_create_graphs_and_samples_store_through_same_flow(self):
+    def test_legacy_saved_circuit_remains_readable(self):
+        data = parse_netlist(generic_netlist("Arduino_UNO_R3"))
+        cid = self.own(self.store.save(data))
+        self.store.db.select_graph(self.store.graph_name(cid)).query(
+            "MATCH (m:Circuit) SET m.sample='legacy'")
+        restored = self.store.read(cid)
+        metadata = restored.pop("storage")
+        self.assertNotIn("sample", metadata)
+        self.assertEqual(restored, data)
+
+    def test_unknown_ids_do_not_create_graphs(self):
         cid = uuid4().hex
         response = self.client.get(f"/api/circuits/{cid}")
         self.assertEqual(response.status_code, 404)
         self.assertFalse(self.store.db.connection.exists(self.store.graph_name(cid)))
-        response = self.client.post("/api/circuits/samples/missing-ground")
-        self.assertEqual(response.status_code, 201)
-        cid = self.own(response.json())
-        stored = self.client.get(f"/api/circuits/{cid}").json()
-        self.assertEqual(stored["storage"]["sample"], "missing-ground")
+
 
 
 if __name__ == "__main__":

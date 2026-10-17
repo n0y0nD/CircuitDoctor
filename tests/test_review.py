@@ -1,6 +1,6 @@
-"""Review observations follow current graph relationships, not sample names."""
+"""Review observations follow current graph relationships."""
+import copy
 import os
-from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -8,11 +8,9 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from redis.exceptions import ResponseError
 from circuitdoctor.api import app
-from circuitdoctor.parser import load_netlist, parse_netlist
+from circuitdoctor.parser import parse_netlist
 from circuitdoctor.storage import CircuitStore, StorageUnavailable, get_store
 from test_storage import generic_netlist
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReviewFailureTests(unittest.TestCase):
@@ -48,17 +46,23 @@ class ReviewIntegrationTests(unittest.TestCase):
         return response.json()
 
     def test_unmarked_singleton_is_information_with_evidence_not_a_diagnosis(self):
-        clean = self.review(self.save(load_netlist(ROOT / 'samples/clean.net')))
-        faulty = self.review(self.save(load_netlist(ROOT / 'samples/missing_ground.net')))
+        data = parse_netlist(generic_netlist("Arduino_UNO_R3"))
+        # Mark a spare pin unused; remove one member from a shared wire into
+        # its own net. This checks generic connectivity without assuming a load.
+        data['nets'].append({'code': 'unused', 'name': 'unused', 'nodes': [
+            {'ref': 'CTRL7', 'pin': '03', 'pinfunction': 'A0', 'pintype': 'input+no_connect'}]})
+        clean = self.review(self.save(data))
+        changed = copy.deepcopy(data)
+        loose = changed['nets'][0]['nodes'].pop()
+        changed['nets'].append({'code': 'loose', 'name': 'loose', 'nodes': [loose]})
+        faulty = self.review(self.save(changed))
         self.assertEqual(clean['summary']['warnings'], 0)
-        self.assertGreater(clean['summary']['marked_unused_pins'], 20)
+        self.assertEqual(clean['summary']['marked_unused_pins'], 1)
         self.assertEqual(faulty['summary']['warnings'], 0)
-        self.assertEqual(faulty['summary']['information'], 1)
         finding = next(f for f in faulty['findings'] if f['rule'] == 'single_pin_net')
-        self.assertEqual(finding['rule'], 'single_pin_net')
-        self.assertIn('D1 pin 1', finding['message'])
-        self.assertNotIn('GND', finding['suggestion'])  # No guessed destination.
-        self.assertIn('p:["D1","1"]', [n['id'] for n in finding['evidence']['nodes']])
+        self.assertIn('X42 pin IN_A', finding['message'])
+        self.assertNotIn('GND', finding['suggestion'])
+        self.assertIn('p:["X42","IN_A"]', [n['id'] for n in finding['evidence']['nodes']])
         self.assertEqual(len(finding['evidence']['paths'][0]), 3)
         self.assertTrue(clean['cannot_verify'])
         self.assertEqual(clean['scope'], 'connectivity_and_board_rails')

@@ -18,7 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && chown circuitdoctor:circuitdoctor /app/secrets \
     && chmod 700 /app/secrets
 COPY circuitdoctor/ ./circuitdoctor/
-COPY samples/*.net ./samples/
 COPY --from=frontend /build/frontend/dist ./frontend/dist
 USER circuitdoctor
 EXPOSE 8000

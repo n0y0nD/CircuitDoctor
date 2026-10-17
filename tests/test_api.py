@@ -18,16 +18,15 @@ class WorkspaceApiTests(unittest.TestCase):
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 
-    def test_both_samples_match_direct_parser_output(self):
-        for name, filename in (("clean", "clean.net"),
-                               ("missing-ground", "missing_ground.net")):
-            with self.subTest(sample=name):
-                response = self.client.get(f"/api/samples/{name}")
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json(), load_netlist(ROOT / "samples" / filename))
+    def test_removed_sample_routes_are_not_available(self):
+        with patch("circuitdoctor.api.get_store") as store:
+            for name in ("clean", "missing-ground"):
+                self.assertEqual(self.client.get(f"/api/samples/{name}").status_code, 404)
+                self.assertIn(self.client.post(f"/api/circuits/samples/{name}").status_code, (404, 405))
+            store.assert_not_called()
 
     def test_raw_upload_preserves_connectivity_and_accepts_utf8_bom(self):
-        path = ROOT / "samples/missing_ground.net"
+        path = ROOT / "tests/fixtures/kicad/nano_normal.net"
         response = self.client.post("/api/parse", content=b"\xef\xbb\xbf" + path.read_bytes(),
                                     headers={"Content-Type": "application/octet-stream"})
         self.assertEqual(response.status_code, 200)
@@ -45,10 +44,6 @@ class WorkspaceApiTests(unittest.TestCase):
         with patch("circuitdoctor.api.MAX_FILE_BYTES", 32):
             response = self.client.post("/api/parse", content=iter([b"(" * 20, b")" * 20]))
         self.assertEqual(response.status_code, 413)
-
-    def test_only_known_examples_are_served(self):
-        response = self.client.get("/api/samples/README.md")
-        self.assertEqual(response.status_code, 404)
 
     def test_status_reports_actual_database_availability_without_claiming_diagnosis(self):
         for connected in (True, False):
@@ -70,7 +65,7 @@ class WorkspaceApiTests(unittest.TestCase):
     def test_database_failure_is_not_a_parser_only_success(self):
         with patch("circuitdoctor.api.get_store", side_effect=StorageUnavailable("Database offline")):
             status = self.client.get("/api/status")
-            response = self.client.post("/api/circuits", content=(ROOT / "samples/clean.net").read_bytes())
+            response = self.client.post("/api/circuits", content=(ROOT / "tests/fixtures/kicad/uno_normal.net").read_bytes())
         self.assertEqual(status.json()["graph_storage"], "unavailable")
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("components", response.json())

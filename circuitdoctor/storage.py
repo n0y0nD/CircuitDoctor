@@ -78,7 +78,7 @@ class CircuitStore:
         for start in range(0, len(rows), BATCH_SIZE):
             graph.query(query, {"rows": rows[start:start + BATCH_SIZE]}, timeout=10000)
 
-    def save(self, circuit, *, filename="circuit.net", sample=""):
+    def save(self, circuit, *, filename="circuit.net"):
         circuit_id = uuid4().hex
         graph_name = self.graph_name(circuit_id)
         graph = self.db.select_graph(graph_name)
@@ -114,12 +114,12 @@ class CircuitStore:
 
         try:
             graph.query("CREATE (:Circuit {id:$id, version:$version, design:$design, "
-                        "libparts:$libparts, filename:$filename, sample:$sample, "
+                        "libparts:$libparts, filename:$filename, "
                         "fingerprint:$fingerprint, ready:false})", {
                             "id": circuit_id, "version": circuit["version"],
                             "design": _json(circuit["design"]),
                             "libparts": _json(circuit["libparts"]),
-                            "filename": filename[:255], "sample": sample,
+                            "filename": filename[:255],
                             "fingerprint": hashlib.sha256(_json(circuit).encode()).hexdigest(),
                         })
             for label, prop in (("Component", "ref"), ("Pin", "id"), ("Net", "code")):
@@ -152,10 +152,10 @@ class CircuitStore:
             if not self.db.connection.exists(name):
                 raise CircuitNotFound(circuit_id)
             rows = graph.ro_query("MATCH (m:Circuit {ready:true}) RETURN "
-                                  "m.version,m.design,m.libparts,m.filename,m.sample").result_set
+                                  "m.version,m.design,m.libparts,m.filename").result_set
             if not rows:
                 raise CircuitNotFound(circuit_id)
-            version, design, libparts, filename, sample = rows[0]
+            version, design, libparts, filename = rows[0]
             components = graph.ro_query("MATCH (c:Component) RETURN c.ref,c.value,c.metadata "
                                         "ORDER BY c.position").result_set
             net_rows = graph.ro_query("MATCH (n:Net) RETURN n.code,n.name ORDER BY n.position").result_set
@@ -173,7 +173,7 @@ class CircuitStore:
                            for ref, value, meta in components],
             "nets": list(nets.values()),
             "storage": {"source": "falkordb", "circuit_id": circuit_id, "graph_name": name,
-                        "filename": filename, "sample": sample, "pins": pin_count,
+                        "filename": filename, "pins": pin_count,
                         "connections": len(connections), "query": READ_CONNECTIONS},
         }
 

@@ -6,8 +6,6 @@
 !circuitdoctor/**
 !frontend/
 !frontend/**
-!samples/
-!samples/*.net
 **/__pycache__/
 **/*.py[cod]
 **/node_modules/
