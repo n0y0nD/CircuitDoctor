@@ -3,6 +3,12 @@
 Upload a KiCad netlist, explore its connections, check Arduino power-rail wiring,
 and ask Gemini questions backed by evidence from FalkorDB.
 
+I2C review checks the exact ER-OLEDM0.91-1 I2C symbol's SDA/SCL pins against
+Uno R3 and classic Nano hardware I2C pins through FalkorDB wire routes. It highlights
+missing wires, crossed hardware signals and joined SDA/SCL lines. Unknown parts,
+conflicting metadata and paths through intermediate parts remain unverified.
+Software I2C, pull-ups, logic levels and successful communication are not assessed.
+
 ## Run with Docker
 
 Install Git and Docker with Docker Compose, and start the Docker engine. No local

@@ -1,7 +1,7 @@
 {
-  "version": 1,
-  "verified_on": "2026-10-17",
-  "scope": "Nominal board power rails only; no GPIO limits, load currents or external-part ratings.",
+  "version": 2,
+  "verified_on": "2026-10-18",
+  "scope": "Nominal board power rails and hardware I2C pin mapping; no GPIO limits or load currents.",
   "matching": "Exact KiCad library and part identity, then exported pin names. Pin numbers are never mapped to physical board positions.",
   "notes": [
     "Nominal rail voltages describe the design, not a measurement or proof of power.",
@@ -58,7 +58,57 @@
           "title": "Arduino Uno R3 official datasheet",
           "url": "https://docs.arduino.cc/resources/datasheets/A000066-datasheet.pdf"
         }
-      ]
+      ],
+      "i2c": {
+        "pins": [
+          {
+            "number": "13",
+            "signal": "SDA",
+            "names": [
+              "SDA",
+              "A4",
+              "SDA/A4",
+              "A4/SDA"
+            ]
+          },
+          {
+            "number": "14",
+            "signal": "SCL",
+            "names": [
+              "SCL",
+              "A5",
+              "SCL/A5",
+              "A5/SCL"
+            ]
+          },
+          {
+            "number": "31",
+            "signal": "SDA",
+            "names": [
+              "SDA",
+              "A4",
+              "SDA/A4",
+              "A4/SDA"
+            ]
+          },
+          {
+            "number": "32",
+            "signal": "SCL",
+            "names": [
+              "SCL",
+              "A5",
+              "SCL/A5",
+              "A5/SCL"
+            ]
+          }
+        ],
+        "sources": [
+          {
+            "title": "KiCad Arduino symbol pin IDs (not physical Arduino labels)",
+            "url": "https://github.com/KiCad/kicad-symbols/blob/master/MCU_Module.lib"
+          }
+        ]
+      }
     },
     {
       "id": "Arduino_Nano_v3.x",
@@ -103,7 +153,37 @@
           "title": "Classic Arduino Nano official datasheet",
           "url": "https://docs.arduino.cc/resources/datasheets/A000005-datasheet.pdf"
         }
-      ]
+      ],
+      "i2c": {
+        "pins": [
+          {
+            "number": "23",
+            "signal": "SDA",
+            "names": [
+              "SDA",
+              "A4",
+              "SDA/A4",
+              "A4/SDA"
+            ]
+          },
+          {
+            "number": "24",
+            "signal": "SCL",
+            "names": [
+              "SCL",
+              "A5",
+              "SCL/A5",
+              "A5/SCL"
+            ]
+          }
+        ],
+        "sources": [
+          {
+            "title": "KiCad Arduino symbol pin IDs (not physical Arduino labels)",
+            "url": "https://github.com/KiCad/kicad-symbols/blob/master/MCU_Module.lib"
+          }
+        ]
+      }
     }
   ]
 }

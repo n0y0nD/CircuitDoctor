@@ -28,6 +28,11 @@ export interface Review {
     nominal_voltage?: number; operating_range?: { min: number; max: number }; reason?: string;
     sources: { title: string; url: string }[];
   }[] };
+  i2c?: { checked_pins: number; unverified_pins: number; scope: string; checks: {
+    ref: string; pin: string; signal: 'SDA' | 'SCL';
+    status: 'connected' | 'mismatch' | 'joined' | 'unconnected' | 'unverified';
+    message: string; sources: { title: string; url: string }[];
+  }[] };
   isolation?: { algorithm: string; group_count: number; separate_groups: number; board_refs: string[]; scope: string };
   summary: { components: number; nets: number; pins: number; warnings: number; information: number; marked_unused_pins: number; unknown_pin_names: number; unknown_pin_types: number };
   findings: Finding[];

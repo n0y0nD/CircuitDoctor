@@ -1,11 +1,18 @@
 {
-  "version": 2,
+  "version": 3,
   "verified_on": "2026-10-18",
-  "scope": "Required logic supply/ground pins; nominal supply range only where the exact variant is verified. No signal, current or backlight limits.",
+  "scope": "Required logic supply/ground pins; nominal supply range only where the exact variant is verified. Catalog I2C signal pin mapping; no logic-level, current or backlight limits.",
   "parts": [
     {
       "match": {"lib": "Display_Graphic", "part": "ER_OLEDM0.91_1x-I2C"},
       "name": "0.91-inch I2C OLED (ER-OLEDM0.91-1)",
+      "i2c": {
+        "pins": [
+          {"number": "3", "names": ["SCL"], "signal": "SCL"},
+          {"number": "4", "names": ["SDA"], "signal": "SDA"}
+        ],
+        "sources": [{"title": "EastRising ER-OLEDM0.91-1 datasheet, section 4.1 (I2C interface)", "url": "https://www.buydisplay.com/download/manual/ER-OLEDM0.91-1_Datasheet.pdf"}]
+      },
       "voltage": {
         "power_pin": "2", "ground_pin": "1", "min": 3.0, "max": 5.0,
         "sources": [{"title": "EastRising ER-OLEDM0.91-1 datasheet, section 4.4 (operating supply, not absolute maximum)", "url": "https://www.buydisplay.com/download/manual/ER-OLEDM0.91-1_Datasheet.pdf"}]
