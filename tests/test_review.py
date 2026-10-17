@@ -47,13 +47,14 @@ class ReviewIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
-    def test_clean_and_missing_ground_only_flag_unmarked_singleton(self):
+    def test_unmarked_singleton_is_information_with_evidence_not_a_diagnosis(self):
         clean = self.review(self.save(load_netlist(ROOT / 'samples/clean.net')))
         faulty = self.review(self.save(load_netlist(ROOT / 'samples/missing_ground.net')))
         self.assertEqual(clean['summary']['warnings'], 0)
         self.assertGreater(clean['summary']['marked_unused_pins'], 20)
-        self.assertEqual(faulty['summary']['warnings'], 1)
-        finding = next(f for f in faulty['findings'] if f['severity'] == 'warning')
+        self.assertEqual(faulty['summary']['warnings'], 0)
+        self.assertEqual(faulty['summary']['information'], 1)
+        finding = next(f for f in faulty['findings'] if f['rule'] == 'single_pin_net')
         self.assertEqual(finding['rule'], 'single_pin_net')
         self.assertIn('D1 pin 1', finding['message'])
         self.assertNotIn('GND', finding['suggestion'])  # No guessed destination.
@@ -67,7 +68,8 @@ class ReviewIntegrationTests(unittest.TestCase):
           (nets (net (code 001) (name "unconnected-but-unmarked") (node (ref CUSTOM) (pin 007) (pintype passive)))
                 (net (code 002) (name arbitrary) (node (ref CUSTOM) (pin 008) (pintype "input+no_connect")))))''')
         result = self.review(self.save(data))
-        self.assertEqual(result['summary']['warnings'], 1)
+        self.assertEqual(result['summary']['warnings'], 0)
+        self.assertEqual(result['summary']['information'], 1)
         self.assertEqual(result['summary']['marked_unused_pins'], 1)
         finding = result['findings'][0]
         self.assertEqual(finding['selection'], {'net_code': '001'})
@@ -92,7 +94,8 @@ class ReviewIntegrationTests(unittest.TestCase):
         graph = self.store.db.select_graph(self.store.graph_name(first))
         graph.query('MATCH (p:Pin)-[e:ON_NET]->() WHERE p.number IN $pins DELETE e', {'pins': ['02', 'IN_A']})
         changed = self.review(first)
-        self.assertEqual(changed['summary']['warnings'], 1)
+        self.assertEqual(changed['summary']['warnings'], 0)
+        self.assertTrue(any(f['rule'] == 'single_pin_net' and f['severity'] == 'info' for f in changed['findings']))
         self.assertEqual(self.review(second)['summary']['warnings'], 0)
         graph.query('MATCH ()-[e:ON_NET]->() DELETE e')
         empty_net = self.review(first)

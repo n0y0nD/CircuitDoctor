@@ -10,7 +10,7 @@ function fixture(part = 'Arduino_UNO_R3') {
       { num: '007', name: 'D13' }, { num: '6', name: 'GND' }, { num: '7', name: 'GND' }, { num: '9', name: 'A0' },
     ] }],
     nets: [
-      { code: '1', name: 'drive', nodes: [{ ref: component.ref, pin: '007', pinfunction: 'D13', pintype: 'output' }] },
+      { code: '1', name: 'drive', nodes: [{ ref: component.ref, pin: '007', pinfunction: 'D13', pintype: 'output' }, { ref: 'LOAD', pin: '1', pinfunction: 'IN', pintype: 'input' }] },
       { code: '2', name: 'return', nodes: ['6','7'].map(pin => ({ ref: component.ref, pin, pinfunction: 'GND', pintype: 'power_in' })) },
       { code: '3', name: 'unused', nodes: [{ ref: component.ref, pin: '9', pinfunction: 'A0', pintype: 'input+no_connect' }] },
     ],
@@ -47,4 +47,10 @@ test('missing library metadata retains actual exported pins without inventing Ar
   const board = boardDrawing(circuit, component);
   assert.equal(board.ports.get('007').label, 'Pin 007');
   assert.equal(board.ports.size, 4);
+});
+
+ test('a lone Arduino pin is not colored as a connected socket', () => {
+  const { component, circuit } = fixture();
+  circuit.nets[0].nodes.pop();
+  assert.equal(boardDrawing(circuit, component).ports.get('007').connected, false);
 });

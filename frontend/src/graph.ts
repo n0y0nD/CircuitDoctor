@@ -1,5 +1,5 @@
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
-import { componentKind, displayValue, isUnused, netLabel, pinName, type Circuit, type Selection } from './types';
+import { componentKind, displayValue, visibleNets, netLabel, pinName, type Circuit, type Selection } from './types';
 import { circuitArt } from './circuit-art';
 import { boardDrawing } from './board-art';
 import { evidenceMemberships, type Explanation } from './explanation';
@@ -17,12 +17,12 @@ export class CircuitGraph {
   private initial = new Map<string, Point>();
   private arrangement: Map<string, Point>;
   constructor(container: HTMLElement, circuit: Circuit, showUnused: boolean,
-    onSelect: (selection: Selection) => void, onZoom: (value: number) => void) {
+    onSelect: (selection: Selection) => void, onZoom: (value: number) => void, selection: Selection | null = null) {
     const key = circuit.storage.circuit_id;
     this.arrangement = arrangements.get(key) || new Map();
     arrangements.set(key, this.arrangement);
     if (arrangements.size > 20) arrangements.delete(arrangements.keys().next().value!);
-    const nets = circuit.nets.filter(n => showUnused || !isUnused(n));
+    const nets = visibleNets(circuit, showUnused, selection);
     const root = circuit.components.find(c => componentKind(c) === 'board') || circuit.components[0];
     const ground = (name: string) => /^(GND|GROUND|VSS)$/i.test(name.replace(/^\//,''));
     // Connectivity determines placement; shared ground does not flatten every component into one column.

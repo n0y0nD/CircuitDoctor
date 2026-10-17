@@ -2,12 +2,16 @@ import "@fontsource-variable/inter";
 import "./style.css";
 import { ChatPanel } from "./chat-panel";
 import type { Explanation } from "./explanation";
+import { renderConnectionExplanation } from "./connection-explanation";
 import { icon } from "./icons";
 import { CircuitGraph } from "./graph";
 import { ExplanationRequest, type ExplanationState } from "./explanation";
 import { ReviewRequest, type ReviewState, type Finding } from "./review";
 import {
   componentKind,
+  connectionLabel,
+  endpointLabel,
+  visibleNets,
   displayValue,
   escapeHtml as esc,
   isUnused,
@@ -76,7 +80,7 @@ $("#app").innerHTML = `
   <section class="circuit-section" id="circuit-section" aria-label="Your uploaded circuit" hidden>
     <div class="circuit-topline"><div class="circuit-title-group"><span class="file-icon">${icon("file", 23)}</span><div><h1 id="circuit-title"></h1><p id="circuit-summary"></p></div></div><button class="icon-button" id="clear-circuit" aria-label="Close circuit and return to upload" title="Close circuit">${icon("close", 19)}</button></div>
     <section class="review-panel" aria-label="Circuit review">
-      <div class="review-heading"><div><h2>Circuit review</h2><p>Check connections and supported Arduino power rails.</p></div><button id="run-review" class="button primary">Run review</button></div>
+      <div class="review-heading"><div><h2>Check your connections</h2><p>See what needs attention, then select it to see the wiring.</p></div><button id="run-review" class="button primary">Run review</button></div>
       <div id="review-results" aria-live="polite"></div>
     </section>
     <div class="workbench">
@@ -86,9 +90,9 @@ $("#app").innerHTML = `
           <button data-view="components" role="tab" aria-selected="false">Components</button>
           <button data-view="nets" role="tab" aria-selected="false">Connections</button>
         </div><button class="icon-button" id="expand-canvas" aria-label="Expand workspace" title="Expand workspace">${icon("fit", 18)}</button></div>
-        <div class="explorer-subbar"><label class="search-field">${icon("search", 16)}<input id="search" placeholder="Find a component or net" aria-label="Find a component or net"/></label><label class="toggle-label"><input type="checkbox" id="unused-toggle"/><span>Show unused pins</span></label></div>
+        <div class="explorer-subbar"><label class="search-field">${icon("search", 16)}<input id="search" placeholder="Find a component or net" aria-label="Find a component or net"/></label><label class="toggle-label"><input type="checkbox" id="unused-toggle"/><span>Show unconnected pins</span></label></div>
         <div class="canvas-wrap"><div id="graph-view" class="graph-view" role="tabpanel" aria-label="Circuit graph. Use Components and Connections for keyboard-accessible details."></div><div id="list-view" class="list-view" role="tabpanel" hidden></div><div id="canvas-empty" class="canvas-empty" hidden><h2>No components in this file</h2><p>Upload a netlist with components and connections to explore.</p></div><div class="graph-controls" id="graph-controls"><button class="icon-button" id="zoom-out" aria-label="Zoom out">${icon("minus", 16)}</button><span id="zoom-value">100%</span><button class="icon-button" id="zoom-in" aria-label="Zoom in">${icon("plus", 16)}</button><button class="icon-button" id="fit-view" aria-label="Fit graph to screen">${icon("fit", 17)}</button><button class="reset-layout" id="reset-layout" title="Restore automatic placement">Reset layout</button></div><span class="canvas-hint" id="canvas-hint">Drag parts / ○ wire bends · Double-click part to zoom</span></div>
-        <div class="graph-footer"><div class="legend"><span><i class="legend-component"></i> Component</span><span><i class="legend-net"></i> Wire junction</span><span><i class="legend-single"></i> Single pin</span></div><span id="graph-summary"></span></div>
+        <div class="graph-footer"><div class="legend"><span><i class="legend-component"></i> Component</span><span><i class="legend-net"></i> Wire junction</span><span><i class="legend-single"></i> Unconnected pin</span></div><span id="graph-summary"></span></div>
       </section>
       <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="selected-finding" hidden></div><div id="inspector-body"></div><section id="explanation-panel" class="explanation-panel" aria-label="Connection explanation" hidden></section></aside>
     </div>
@@ -244,7 +248,7 @@ function renderCircuit() {
     ? (boards[0].libsource.part || boards[0].value) === "Arduino_UNO_R3" ? "Arduino Uno R3" : "Classic Nano"
     : boards.length > 1 ? `${boards.length} Arduino boards` : "Board not identified";
   $("#circuit-title").textContent = filename;
-  $("#circuit-summary").textContent = `${board} · ${circuit.components.length} components · ${circuit.nets.length} nets`;
+  $("#circuit-summary").textContent = `${board} · ${circuit.components.length} components · ${circuit.nets.filter(n => n.nodes.length > 1).length} connections`;
   $("#copy-json").removeAttribute("disabled");
   $("#canvas-empty").hidden = circuit.components.length > 0 || circuit.nets.length > 0;
   renderView();
@@ -289,14 +293,15 @@ function renderView() {
       (value) => {
         $("#zoom-value").textContent = `${value}%`;
       },
+      selection,
     );
     graph.select(selection);
     graph.search(query);
     graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null));
   } else renderList();
-  const shown = circuit.nets.filter((n) => showUnused || !isUnused(n)).length;
+  const shown = visibleNets(circuit, showUnused, selection).length;
   $("#graph-summary").textContent =
-    `${circuit.components.length} components · ${shown} nets in view`;
+    `${circuit.components.length} components · ${shown} connections in view`;
 }
 function renderList() {
   if (!circuit) return;
@@ -311,21 +316,20 @@ function renderList() {
     $("#list-view").innerHTML =
       `<div class="table-caption">${list.length} component${list.length === 1 ? "" : "s"} in this view</div><table><thead><tr><th>Reference</th><th>Component</th><th>Library</th><th></th></tr></thead><tbody>${list.map((c) => `<tr class="${selection?.kind === "component" && selection.id === c.ref ? "selected-row" : ""}"><td><button class="reference-button" data-component="${esc(c.ref)}">${esc(c.ref)}</button></td><td>${esc(displayValue(c))}</td><td class="muted-cell">${esc(c.libsource.lib || "Unknown")}</td><td><button class="icon-button" data-component="${esc(c.ref)}" aria-label="Inspect ${esc(c.ref)}">${icon("chevron", 15)}</button></td></tr>`).join("")}</tbody></table>${!list.length ? '<div class="no-results">No components match your search.</div>' : ""}`;
   } else {
-    const nets = circuit.nets.filter(
+    const nets = visibleNets(circuit, showUnused, selection).filter(
       (n) =>
-        (showUnused || !isUnused(n)) &&
-        `${n.name} ${n.nodes.map((p) => `${p.ref} ${p.pin}`).join(" ")}`
+        `${n.name} ${n.nodes.map((p) => `${p.ref} ${p.pin} ${pinName(circuit!, p)}`).join(" ")}`
           .toLowerCase()
           .includes(filter),
     );
     $("#list-view").innerHTML =
-      `<div class="table-caption">${nets.length} net${nets.length === 1 ? "" : "s"} in this view</div><table><thead><tr><th>Net</th><th>Connected pins</th><th></th></tr></thead><tbody>${nets.map((n) => `<tr class="${selection?.kind === "net" && selection.id === n.code ? "selected-row" : ""}"><td><button class="net-button" data-net="${esc(n.code)}">${esc(netLabel(n))}</button><small class="net-note">${isUnused(n) ? "Intentionally unused" : n.nodes.length === 1 ? "Single pin" : `${n.nodes.length} pins`}</small></td><td class="pin-cell">${esc(n.nodes.map((p) => `${p.ref}.${p.pin}`).join(", "))}</td><td><button class="icon-button" data-net="${esc(n.code)}" aria-label="Inspect net ${esc(n.name)}">${icon("chevron", 15)}</button></td></tr>`).join("")}</tbody></table>${!nets.length ? '<div class="no-results">No nets match your search. Try including unused pins.</div>' : ""}`;
+      `<div class="table-caption">${nets.length} connections · Select a row to see the details</div><div class="wiring-list">${nets.map(n => `<button class="wiring-row ${selection?.kind === "net" && selection.id === n.code ? "selected-row" : ""}" data-net="${esc(n.code)}"><span><strong>${esc(connectionLabel(circuit!, n))}</strong><small>${n.nodes.length > 1 ? n.nodes.map(p => { const c = circuit!.components.find(c => c.ref === p.ref); return `${p.ref}: ${c ? displayValue(c) : "Component"}`; }).filter((v, i, all) => all.indexOf(v) === i).map(esc).join(" · ") : isUnused(n) ? "Marked unused in the file" : "No other pin connected"}</small></span>${icon("chevron", 15)}</button>`).join("")}</div>${!nets.length ? '<div class="no-results">No connections match. Try showing unconnected pins.</div>' : ""}`;
   }
 }
 function renderInspector() {
   const findingPanel = $("#selected-finding");
   findingPanel.hidden = !selectedFinding;
-  findingPanel.innerHTML = selectedFinding ? `<div class="finding-detail"><span class="finding-severity">${selectedFinding.severity === "warning" ? "Check this connection" : "Information"}</span><h3>${esc(selectedFinding.title)}</h3><p>${esc(selectedFinding.message)}</p><p><strong>What to check:</strong> ${esc(selectedFinding.suggestion)}</p>${sourceLinks(selectedFinding.sources || [])}</div>` : "";
+  findingPanel.innerHTML = selectedFinding ? `<div class="finding-detail ${selectedFinding.severity}"><span class="finding-severity">${selectedFinding.severity === "warning" ? "Check this connection" : "Information"}</span><h3>${esc(selectedFinding.title)}</h3><p>${esc(selectedFinding.message)}</p><p><strong>What to check:</strong> ${esc(selectedFinding.suggestion)}</p>${sourceLinks(selectedFinding.sources || [])}</div>` : "";
   renderExplanation();
   if (!circuit || !selection) {
     $("#inspector-body").innerHTML =
@@ -336,25 +340,25 @@ function renderInspector() {
     const selected = selection;
     const member = circuit.nets.flatMap(net => net.nodes).find(p => p.ref === selected.ref && p.pin === selected.pin);
     const nets = circuit.nets.filter(net => net.nodes.some(p => p.ref === selected.ref && p.pin === selected.pin));
-    $("#inspector-body").innerHTML = `<div class="component-heading"><span class="component-symbol">${icon("chip", 25)}</span><div><span class="component-ref">${esc(selected.ref)} · PIN ${esc(selected.pin)}</span><h4>${esc(member ? pinName(circuit, member) : `Pin ${selected.pin}`)}</h4></div></div><p class="inspector-description">Follow this pin’s connections in your uploaded circuit.</p><div class="pin-list">${nets.map(net => `<button class="pin-row" data-net="${esc(net.code)}">${icon("net", 16)}<span><strong>${esc(netLabel(net))}</strong><small>View this net</small></span>${icon("chevron", 13)}</button>`).join("")}<button class="text-button" data-component="${esc(selected.ref)}">Back to ${esc(selected.ref)}</button></div>`;
+    $("#inspector-body").innerHTML = `<div class="component-heading"><span class="component-symbol">${icon("chip", 25)}</span><div><span class="component-ref">${esc(selected.ref)} · PIN ${esc(selected.pin)}</span><h4>${esc(member ? pinName(circuit, member) : `Pin ${selected.pin}`)}</h4></div></div><p class="inspector-description">Follow this pin’s connections in your uploaded circuit.</p><div class="pin-list">${nets.map(net => `<button class="pin-row" data-net="${esc(net.code)}">${icon("net", 16)}<span><strong>${esc(connectionLabel(circuit!, net))}</strong><small>See connected pins</small></span>${icon("chevron", 13)}</button>`).join("")}<button class="text-button" data-component="${esc(selected.ref)}">Back to ${esc(selected.ref)}</button></div>`;
   } else if (selection.kind === "component") {
     const comp = circuit.components.find((c) => c.ref === selection!.id);
     if (!comp) return;
     const connections = circuit.nets.flatMap((net) =>
       net.nodes.filter((p) => p.ref === comp.ref).map((pin) => ({ net, pin })),
     );
-    const active = connections.filter((c) => !isUnused(c.net));
+    const active = connections.filter(c => showUnused || c.net.nodes.length > 1);
     const library = circuit.libparts.find(
       (p) => p.lib === comp.libsource.lib && p.part === comp.libsource.part,
     );
     const kind = componentKind(comp);
     $("#inspector-body").innerHTML =
-      `<div class="component-heading"><span class="component-symbol ${kind}">${icon(kind === "board" || kind === "component" ? "chip" : kind, 26)}</span><div><span class="component-ref">${esc(comp.ref)}</span><h4>${esc(displayValue(comp))}</h4></div></div><dl class="component-facts"><div><dt>Symbol library</dt><dd>${esc(comp.libsource.lib || "Unknown")}</dd></div><div><dt>Exported pins</dt><dd>${library?.pins.length ?? connections.length}</dd></div><div><dt>Pins shown</dt><dd>${active.length}</dd></div></dl><div class="connections-heading">CONNECTIONS <span>${active.length}</span></div><div class="pin-list">${active.map(({ net, pin }) => `<button class="pin-row" data-pin-ref="${esc(pin.ref)}" data-pin="${esc(pin.pin)}"><span class="pin-square">${esc(pin.pin)}</span><span><strong>${esc(pinName(circuit!, pin))}</strong><small>${esc(netLabel(net))}</small></span>${icon("chevron", 13)}</button>`).join("") || '<p class="inspector-description">No pins are shown. Exported unused pins are hidden here.</p>'}</div>${connections.length > active.length ? `<div class="unused-note">${icon("help", 14)} ${connections.length - active.length} pins marked unused in the file.</div>` : ""}`;
+      `<div class="component-heading"><span class="component-symbol ${kind}">${icon(kind === "board" || kind === "component" ? "chip" : kind, 26)}</span><div><span class="component-ref">${esc(comp.ref)}</span><h4>${esc(displayValue(comp))}</h4></div></div><dl class="component-facts"><div><dt>Symbol library</dt><dd>${esc(comp.libsource.lib || "Unknown")}</dd></div><div><dt>Exported pins</dt><dd>${library?.pins.length ?? connections.length}</dd></div><div><dt>Pins shown</dt><dd>${active.length}</dd></div></dl><div class="connections-heading">CONNECTIONS <span>${active.length}</span></div><div class="pin-list">${active.map(({ net, pin }) => `<button class="pin-row" data-pin-ref="${esc(pin.ref)}" data-pin="${esc(pin.pin)}"><span class="pin-square">${esc(pin.pin)}</span><span><strong>${esc(pinName(circuit!, pin))}</strong><small>${esc(net.nodes.filter(p => p.ref !== pin.ref || p.pin !== pin.pin).map(p => endpointLabel(circuit!, p)).join(", ") || "No other pin connected")}</small></span>${icon("chevron", 13)}</button>`).join("") || '<p class="inspector-description">No connections to other pins. Enable “Show unconnected pins” to see more.</p>'}</div>${connections.length > active.length ? `<div class="unused-note">${icon("help", 14)} ${connections.length - active.length} unconnected pins hidden. Use “Show unconnected pins” to see them.</div>` : ""}`;
   } else {
     const net = circuit.nets.find((n) => n.code === selection!.id);
     if (!net) return;
     $("#inspector-body").innerHTML =
-      `<div class="component-heading"><span class="component-symbol net-symbol">${icon("net", 25)}</span><div><span class="component-ref">NET ${esc(net.code)}</span><h4>${esc(netLabel(net))}</h4></div></div><p class="net-full-name">${esc(net.name)}</p><dl class="component-facts"><div><dt>Pin memberships</dt><dd>${net.nodes.length}</dd></div><div><dt>Components</dt><dd>${new Set(net.nodes.map((p) => p.ref)).size}</dd></div></dl>${net.nodes.length === 1 ? `<p class="single-pin-note">${isUnused(net) ? "This pin is marked intentionally unused in the netlist." : "This net contains one pin. This is a connectivity observation, not a diagnosis."}</p>` : ""}<div class="connections-heading">ON THIS NET <span>${net.nodes.length}</span></div><div class="pin-list">${net.nodes.map((pin) => `<button class="pin-row" data-pin-ref="${esc(pin.ref)}" data-pin="${esc(pin.pin)}"><span class="pin-square">${esc(pin.pin)}</span><span><strong>${esc(pin.ref)} · ${esc(pinName(circuit!, pin))}</strong><small>${esc(pin.pintype)}</small></span>${icon("chevron", 13)}</button>`).join("")}</div>`;
+      `<div class="component-heading"><span class="component-symbol net-symbol">${icon("net", 25)}</span><div><span class="component-ref">NET ${esc(net.code)}</span><h4>${esc(connectionLabel(circuit, net))}</h4></div></div><details class="net-file-name"><summary>Wire name in file</summary><p class="net-full-name">${esc(net.name)}</p></details><dl class="component-facts"><div><dt>Pin memberships</dt><dd>${net.nodes.length}</dd></div><div><dt>Components</dt><dd>${new Set(net.nodes.map((p) => p.ref)).size}</dd></div></dl>${net.nodes.length === 1 ? `<p class="single-pin-note">${isUnused(net) ? "This pin is marked intentionally unused in the netlist." : "This pin has no connection to another pin. That may be intentional; check whether your design needs it."}</p>` : ""}<div class="connections-heading">CONNECTED PINS <span>${net.nodes.length}</span></div><div class="pin-list">${net.nodes.map((pin) => `<button class="pin-row" data-pin-ref="${esc(pin.ref)}" data-pin="${esc(pin.pin)}"><span class="pin-square">${esc(pin.pin)}</span><span><strong>${esc(pin.ref)} · ${esc(pinName(circuit!, pin))}</strong><small>${esc(pin.pintype)}</small></span>${icon("chevron", 13)}</button>`).join("")}</div>`;
   }
 }
 
@@ -363,7 +367,14 @@ function renderExplanation() {
   panel.hidden = !circuit || !selection || selection.kind === "component";
   if (panel.hidden) return;
   const loading = explanation.status === "loading";
-  panel.innerHTML = `<button id="explain-connection" class="button primary" ${loading ? 'disabled' : ''}>${loading ? '<span class="spinner small"></span> Reading connections…' : "Explain connection"}</button><button id="trace-power" class="button secondary" ${loading ? 'disabled' : ''}>Trace power rail</button><div id="explanation-result" aria-live="polite" aria-atomic="true">${explanation.status === "success" ? `<p class="evidence-source">${icon("check", 14)} From your saved circuit</p><p class="explanation-summary">${esc(explanation.result.summary)}</p><p class="explanation-hint">Matching pins and wires are highlighted in the Circuit view.</p>${explanation.result.tool === "trace_power" ? `<h4>Direct power connections</h4>${(explanation.result.warnings || []).map(w => `<p class="explanation-error">${esc(w)}</p>`).join("")}<details><summary>Trace limits &amp; sources</summary>${explanation.result.limitations.map(l => `<p class="explanation-limit">${esc(l)}</p>`).join("")}${sourceLinks(explanation.result.sources || [])}</details>` : `<p class="explanation-limit">Connectivity only · This does not confirm whether the circuit works.</p>`}` : explanation.status === "error" ? `<p class="explanation-error" role="alert">${esc(explanation.message)}</p>` : '<p class="explanation-hint">Explain any connection, or trace a known Arduino power pin and the parts on its net.</p>'}</div>`;
+  const result = explanation.status === "success" ? explanation.result : null;
+  panel.innerHTML = `<button id="explain-connection" class="button primary" ${loading ? 'disabled' : ''}>${loading ? '<span class="spinner small"></span> Checking connection…' : "Explain connection"}</button>
+    <div id="explanation-result" aria-live="polite" aria-atomic="true">${result ? `
+      ${renderConnectionExplanation(result)}
+      ${result.tool === "trace_power" ? `<p class="explanation-summary">If this supply stops, parts that depend on it may stop working. Other power sources are not checked.</p>${(result.warnings || []).map(w => `<p class="explanation-error">${esc(w)}</p>`).join("")}<details><summary>Power check details</summary>${result.limitations.map(l => `<p class="explanation-hint">${esc(l)}</p>`).join("")}${sourceLinks(result.sources || [])}</details>` : ""}
+      <button class="button secondary show-connection" id="show-explained-connection">Show on circuit</button>`
+      : explanation.status === "error" ? `<p class="explanation-error" role="alert">${esc(explanation.message)}</p>` : '<p class="explanation-hint">See which pins are connected to this one.</p>'}</div>
+    <details class="extra-connection-tools"><summary>Explore power connections</summary><p class="explanation-hint">For an Arduino supply pin, see the pins connected to it.</p><button id="trace-power" class="button secondary" ${loading ? 'disabled' : ''}>Show connected power pins</button></details>`;
 }
 async function explainSelection(mode: "explain" | "power-trace" = "explain") {
   if (!circuit || !selection || selection.kind === "component") return;
@@ -384,7 +395,7 @@ function sourceLinks(sources: { title: string; url: string }[]) {
 function renderReview() {
   const button = $<HTMLButtonElement>("#run-review");
   button.disabled = review.status === "loading";
-  button.textContent = review.status === "loading" ? "Reviewing…" : review.status === "success" ? "Run again" : review.status === "error" ? "Retry review" : "Run review";
+  button.textContent = review.status === "loading" ? "Checking…" : review.status === "success" ? "Check again" : review.status === "error" ? "Retry" : "Check connections";
   const panel = $("#review-results");
   if (review.status === "idle") { panel.innerHTML = ""; return; }
   if (review.status === "loading") { panel.innerHTML = '<p class="review-note" role="status">Reading saved connections from FalkorDB…</p>'; return; }
@@ -392,9 +403,26 @@ function renderReview() {
   const result = review.result;
   const warnings = result.findings.filter(f => f.severity === "warning");
   const information = result.findings.filter(f => f.severity === "info");
-  const cards = (items: Finding[]) => items.map(f => `<button class="finding-card ${f.severity}" data-finding="${esc(f.id)}"><span>${f.severity === "warning" ? "Possible issue" : "Information"}</span><strong>${esc(f.title)}</strong><p>${esc(f.message)}</p><small>Inspect connection →</small></button>`).join("");
-  const heading = result.status === "incomplete" ? "Not enough circuit data to review" : warnings.length ? `${warnings.length} connection${warnings.length === 1 ? "" : "s"} to check` : "No warnings from the available checks";
-  panel.innerHTML = `<h3 class="review-summary">${esc(heading)}</h3><p class="review-note">${result.summary.nets} nets checked · ${result.summary.marked_unused_pins} pins marked unused. Includes limited Arduino power-rail checks; this does not confirm that the circuit works.</p><div class="finding-list">${cards(warnings)}</div>${information.length ? `<details class="review-details"><summary>${information.length} informational finding${information.length === 1 ? "" : "s"}</summary><div class="finding-list">${cards(information)}</div></details>` : ""}<details class="review-details"><summary>Board specifications used · ${result.electrical.recognized_parts.length} matched</summary><p>${result.electrical.checked_nets} nets checked using ${result.electrical.matched_power_pins} identified power/ground pins. Checks: ${esc(result.electrical.checks.join("; "))}.</p>${result.electrical.recognized_parts.map(part => `<p><strong>${esc(part.ref)} · ${esc(part.name)}</strong></p>${sourceLinks(part.sources)}`).join("")}<p>${result.electrical.unknown_components.length ? `No electrical specifications for: ${esc(result.electrical.unknown_components.join(", "))}. Their connections are still included.` : "All component identities matched the supported board catalog."}</p></details><details class="review-details"><summary>What we cannot verify yet</summary>${result.cannot_verify.map(item => `<p><strong>${esc(item.check)}:</strong> ${esc(item.reason)}</p>`).join("")}<p>${result.summary.unknown_pin_names} pins have no name metadata; ${result.summary.unknown_pin_types} have no type metadata. No board pin mapping or electrical limits were guessed.</p></details>`;
+  const unconnected = information.filter(f => f.rule === "single_pin_net" || f.rule === "unassigned_pin");
+  const other = information.filter(f => !unconnected.includes(f));
+  const heading = result.status === "incomplete" ? "Not enough information to check this circuit" : warnings.length ? `${warnings.length} wiring problem${warnings.length === 1 ? "" : "s"} to check` : result.electrical.checked_nets ? "No Arduino power-wire conflicts found" : "No supported power connections to check";
+  const connectionFor = (f: Finding) => {
+    const selector = f.selection;
+    const net = 'net_code' in selector ? circuit?.nets.find(n => n.code === selector.net_code) : null;
+    return net && circuit ? connectionLabel(circuit, net) : 'ref' in selector ? `${selector.ref} · Pin ${selector.pin}` : f.title;
+  };
+  panel.innerHTML = `<h3 class="review-summary">${esc(heading)}</h3>
+    <p class="review-note">Checks Arduino power and ground wiring. Display, sensor and other component requirements are not checked yet.</p>
+    ${warnings.length ? `<div class="finding-list">${warnings.map(f => `<button class="finding-card warning" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(connectionFor(f))}</p><p><b>What to do:</b> ${esc(f.suggestion)}</p><small>Show this connection →</small></button>`).join("")}</div>` : ""}
+    ${unconnected.length ? `<details class="review-details"><summary>${unconnected.length} pins with no connection</summary><p>These may be intentional. Select a pin to check whether your design needs it.</p><div class="unconnected-list">${unconnected.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(connectionFor(f))}<span>Show pin →</span></button>`).join("")}</div></details>` : ""}
+    <details class="review-details"><summary>Check details</summary>
+      ${other.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(f.title)}<span>Show details →</span></button>`).join("")}
+      <p>${result.summary.marked_unused_pins} pins marked intentionally unused in the file.</p>
+      <p>${result.electrical.checked_nets} power/ground nets checked. ${esc(result.electrical.checks.join("; "))}.</p>
+      ${result.electrical.recognized_parts.map(part => `<p><strong>${esc(part.ref)} · ${esc(part.name)}</strong></p>${sourceLinks(part.sources)}`).join("")}
+      ${result.electrical.unknown_components.length ? `<p>No electrical specifications for: ${esc(result.electrical.unknown_components.join(", "))}.</p>` : ""}
+      ${result.cannot_verify.map(item => `<p><strong>${esc(item.check)}:</strong> ${esc(item.reason)}</p>`).join("")}
+    </details>`;
 }
 async function runReview() {
   if (!circuit) return;
@@ -434,6 +462,13 @@ document.addEventListener("click", (event) => {
   if (tab) {
     view = tab.dataset.view as View;
     renderView();
+  }
+  if (target.closest("#show-explained-connection") && explanation.status === "success") {
+    view = "graph";
+    query = "";
+    $<HTMLInputElement>("#search").value = "";
+    renderView();
+    $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
   }
   if (target.closest("#explain-connection:not(:disabled)")) void explainSelection();
   if (target.closest("#trace-power:not(:disabled)")) void explainSelection("power-trace");
@@ -482,6 +517,7 @@ $<HTMLInputElement>("#search").addEventListener("input", (event) => {
 $("#unused-toggle").addEventListener("change", (event) => {
   showUnused = (event.target as HTMLInputElement).checked;
   renderView();
+  renderInspector();
 });
 $("#zoom-in").onclick = () => graph?.zoomBy(1.2);
 $("#zoom-out").onclick = () => graph?.zoomBy(1 / 1.2);

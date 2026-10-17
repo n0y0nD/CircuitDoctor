@@ -1,6 +1,7 @@
 import type { Explanation } from './explanation';
 
 export interface Finding {
+  rule: string;
   id: string;
   severity: 'warning' | 'info';
   title: string;

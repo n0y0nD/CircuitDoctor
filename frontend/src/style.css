@@ -263,3 +263,31 @@ dialog p { font-size: 12px; line-height: 1.7; color: var(--muted); }
 .chat-input-row textarea:focus { outline: 2px solid #16816b; outline-offset: 2px; }
 .chat-input-row button { flex-shrink: 0; }
 @media (max-width: 620px) { .chat-panel { padding: 16px; } .chat-input-row { flex-direction: column; align-items: stretch; } .chat-input-row textarea { width: 100%; box-sizing: border-box; } }
+
+.wiring-list { padding: 0 20px 20px; }
+.wiring-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 16px 10px; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--line); color: var(--text); }
+.wiring-row:hover, .unconnected-row:hover { background: #eef7f2; }
+.wiring-row strong { display: block; font-size: 13px; line-height: 1.7; }
+.wiring-row small { display: block; margin-top: 5px; color: var(--muted); line-height: 1.6; }
+.unconnected-list { max-height: 220px; overflow-y: auto; margin-top: 10px; }
+.unconnected-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--line); padding: 10px; text-align: left; color: #365646; font-size: 12px; }
+.unconnected-row span { white-space: nowrap; font-size: 11px; color: #16836b; }
+.net-file-name { padding: 0 18px 12px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.net-file-name summary { cursor: pointer; }
+
+.finding-detail.info { background: #f7faf8; }
+
+.connection-answer { margin-top: 20px; }
+.connection-answer h4 { margin: 0 0 8px; font-size: 14px; color: #284c3d; }
+.connection-answer-text { margin: 0 0 14px; font-size: 13px; line-height: 1.7; }
+.connection-endpoints { list-style: none; margin: 0; padding: 0 0 0 12px; border-left: 2px solid #93b9a8; }
+.connection-endpoints li { position: relative; margin: 10px 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: white; overflow-wrap: anywhere; }
+.connection-endpoints li::before { content: ''; position: absolute; width: 12px; height: 2px; background: #93b9a8; top: 25px; left: -14px; }
+.connection-endpoints strong, .connection-endpoints span, .connection-endpoints small { display: block; }
+.connection-endpoints strong { font-size: 16px; color: #176c56; }
+.connection-endpoints span { margin-top: 5px; font-size: 12px; color: #355b49; }
+.connection-endpoints small { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.explanation-panel .connection-file-details, .explanation-panel .extra-connection-tools { font-size: 11px; line-height: 1.7; color: var(--muted); }
+.show-connection { width: 100%; margin-top: 16px; }
+.extra-connection-tools { padding-top: 14px; border-top: 1px solid var(--line); }
+.extra-connection-tools .button { width: 100%; margin-top: 12px; }

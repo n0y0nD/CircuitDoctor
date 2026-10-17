@@ -12,7 +12,7 @@ export function boardDrawing(circuit: Circuit, component: Component): BoardDrawi
   const members = circuit.nets.flatMap(n => n.nodes.filter(p => p.ref === component.ref));
   const definitions = new Map((library?.pins || []).map(p => [p.num, p.name]));
   members.forEach(p => { if (!definitions.has(p.pin)) definitions.set(p.pin, pinName(circuit, p)); });
-  const active = new Set(circuit.nets.filter(n => !n.nodes.every(p => p.pintype.split('+').includes('no_connect')))
+  const active = new Set(circuit.nets.filter(n => n.nodes.length > 1)
     .flatMap(n => n.nodes.filter(p => p.ref === component.ref).map(p => p.pin)));
   const clean = (name: string, pin: string) => name && name !== 'unknown'
     ? name.replace(/~\{([^}]+)\}/g, '$1').replace(/^\+/, '').replace(/^3V3$/, '3.3V') : `Pin ${pin}`;

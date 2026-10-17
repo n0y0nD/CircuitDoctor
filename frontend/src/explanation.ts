@@ -1,7 +1,10 @@
 import type { Selection } from './types';
+import type { ExplainedNet, ExplainedPin } from './connection-explanation.ts';
 
 export interface Explanation {
   source: 'falkordb';
+  nets?: ExplainedNet[];
+  selected_pin?: ExplainedPin | null;
   tool?: string;
   warnings?: string[];
   sources?: { title: string; url: string }[];

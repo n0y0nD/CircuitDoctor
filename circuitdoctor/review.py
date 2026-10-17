@@ -19,9 +19,9 @@ def check_rules(store, circuit_id):
     for net in facts["nets"]:
         members = net["pins"]
         if len(members) == 1 and not _marked_unused(members[0]):
-            add("single_pin_net", "warning", "Only one pin on this net",
-                f'{_pin_label(members[0])} is the only pin on net {net["name"]!r}. No second connection is recorded.',
-                "Check whether this pin should connect to another part in the schematic. If it is intentionally unused, mark it accordingly and export again. A single-pin net alone does not prove a fault.", net=net)
+            add("single_pin_net", "info", "Pin has no connection",
+                f'{_pin_label(members[0])} is not connected to another pin in this file.',
+                "Check whether your design needs this pin. An unconnected pin may be intentional; the file alone does not tell us whether it is a problem.", net=net)
         elif not members:
             add("empty_net", "info", "Net has no pin connections",
                 f'Net {net["name"]!r} has no pin memberships in the saved graph.',

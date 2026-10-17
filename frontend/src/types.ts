@@ -81,3 +81,20 @@ export const netLabel = (net: Net) =>
   net.name.startsWith("unconnected-")
     ? `${net.nodes[0].ref}.${net.nodes[0].pin}`
     : net.name.replace(/^\//, "");
+
+// Hide disconnected wire stubs, but always reveal the connection being inspected.
+export function visibleNets(circuit: Circuit, showUnconnected: boolean, selection: Selection | null = null): Net[] {
+  return circuit.nets.filter(net => showUnconnected || net.nodes.length > 1 ||
+    (selection?.kind === "net" && selection.id === net.code) ||
+    (selection?.kind === "pin" && net.nodes.some(pin => pin.ref === selection.ref && pin.pin === selection.pin)));
+}
+
+export function endpointLabel(circuit: Circuit, pin: PinNode): string {
+  const name = pinName(circuit, pin);
+  const sameName = new Set(circuit.nets.flatMap(net => net.nodes)
+    .filter(other => other.ref === pin.ref && pinName(circuit, other) === name).map(other => other.pin));
+  return `${pin.ref} · ${name}${sameName.size > 1 ? ` (pin ${pin.pin})` : ""}`;
+}
+export function connectionLabel(circuit: Circuit, net: Net): string {
+  return net.nodes.map(pin => endpointLabel(circuit, pin)).join(" ↔ ") || "No pins connected";
+}
