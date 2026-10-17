@@ -249,7 +249,11 @@ dialog p { font-size: 12px; line-height: 1.7; color: var(--muted); }
 .chat-question, .chat-answer { font-size: 14px; line-height: 1.7; }
 .chat-question span { display: block; white-space: pre-wrap; }
 .chat-answer { padding: 16px; border-radius: 10px; background: #f4f8f6; }
-.chat-answer > p { white-space: pre-wrap; margin: 8px 0; }
+.chat-answer-body { overflow-wrap: anywhere; }
+.chat-answer-body p { margin: 10px 0; }
+.chat-answer-body ul, .chat-answer-body ol { margin: 10px 0; padding-left: 22px; }
+.chat-answer-body li { margin: 6px 0; }
+.chat-answer-body code { font: inherit; background: #e7efea; padding: 1px 4px; border-radius: 4px; }
 .chat-evidence { margin-top: 12px; font-size: 13px; }
 .chat-evidence summary { cursor: pointer; padding: 8px 0; }
 .chat-evidence-item { padding: 10px 0; border-top: 1px solid #dce5e1; }
