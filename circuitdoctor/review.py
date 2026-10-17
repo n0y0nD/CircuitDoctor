@@ -3,6 +3,7 @@
 from .isolation import isolated_groups
 from .parts import electrical_review
 from .requirements import required_connections
+from .voltage import voltage_review
 from .tools import _known, _marked_unused, _pin_label, describe_connection
 
 
@@ -10,6 +11,7 @@ def check_rules(store, circuit_id):
     facts = store.review_facts(circuit_id)
     isolation = isolated_groups(store, circuit_id, facts)
     required = required_connections(store, circuit_id, facts)
+    voltage = voltage_review(store, circuit_id, facts)
     required_missing = {(f['pin']['ref'], f['pin']['pin']) for f in required['findings']}
     findings = []
     unused = sum(_marked_unused(pin) for pin in facts["pins"])
@@ -47,6 +49,10 @@ def check_rules(store, circuit_id):
         add(item['rule'], item['severity'], item['title'], item['message'], item['suggestion'], pin=item['pin'])
         findings[-1].update(evidence=item['evidence'], sources=item['sources'])
 
+    for item in voltage['findings']:
+        add(item['rule'], item['severity'], item['title'], item['message'], item['suggestion'], pin=item['pin'])
+        findings[-1].update(evidence=item['evidence'], sources=item['sources'], specifications=item['specifications'])
+
     for item in isolation["findings"]:
         findings.append({"id": f"finding-{len(findings) + 1}", **item})
 
@@ -55,7 +61,7 @@ def check_rules(store, circuit_id):
     unknown_names = sum(not _known(pin["name"]) and not _known(pin["pinfunction"]) for pin in facts["pins"])
     unknown_types = sum(not _known(pin["library_type"]) and not _known(pin["pintype"]) for pin in facts["pins"])
     cannot_verify = [
-        {"check": "Full voltage compatibility", "reason": "Only direct connections between identified Uno R3 / classic Nano power and ground pins are checked. GPIO limits, external parts, VIN and actual supply voltages are not verified."},
+        {"check": "Full voltage compatibility", "reason": "Only catalog-listed operating ranges and direct nominal board supply connections are compared. Unknown part variants, external supplies, paths through components, GPIO limits, VIN and actual voltages are not verified."},
         {"check": "Other required connections", "reason": "Only catalog-listed logic power/GND pins are checked. Unknown parts, signal requirements, backlights and pull-ups are not verified."},
         {"check": "Circuit operation", "reason": "Firmware, current, physical wiring and component health are not checked."},
     ]
@@ -64,11 +70,11 @@ def check_rules(store, circuit_id):
     if empty:
         cannot_verify.insert(0, {"check": "Complete connectivity review", "reason": "This export has no components or no nets to review."})
     return {"tool": "check_rules", "source": "falkordb", "circuit_id": circuit_id,
-            "scope": "connectivity_and_board_rails", "electrical": electrical["coverage"], "requirements": required["coverage"], "isolation": isolation["coverage"], "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
+            "scope": "connectivity_and_board_rails", "electrical": electrical["coverage"], "requirements": required["coverage"], "isolation": isolation["coverage"], "voltage": voltage["coverage"], "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
             "summary": {"components": facts["component_count"], "nets": len(facts["nets"]),
                         "pins": len(facts["pins"]), "warnings": warning_count,
                         "information": len(findings) - warning_count, "marked_unused_pins": unused,
                         "unknown_pin_names": unknown_names, "unknown_pin_types": unknown_types},
-            "findings": findings, "cannot_verify": cannot_verify, "queries": facts["queries"] + isolation["queries"] + required["queries"],
-            "limitations": ["Connectivity, limited board rails and catalog-listed required supply pins only. No warnings does not mean the circuit is electrically correct.",
+            "findings": findings, "cannot_verify": cannot_verify, "queries": facts["queries"] + isolation["queries"] + required["queries"] + voltage["queries"],
+            "limitations": ["Connectivity, limited board rails, catalog-listed supply pins and verified nominal supply ranges only. No warnings does not mean the circuit is electrically correct.",
                             "Unused markers are read from pin metadata, not inferred from net names."]}

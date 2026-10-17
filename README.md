@@ -77,7 +77,7 @@ the host port in `compose.yaml`. Website: 8080; database: 6379; database viewer:
   LCD-016N002L). FalkorDB checks each required pin’s wire neighbours and routes
   to known Arduino rails/ground. A required pin with no connected peer gets a
   warning and pin evidence; other supply arrangements remain unverified.
-  Corrected uploads are checked independently. No voltage compatibility is inferred.
+  Corrected uploads are checked independently. Supply-voltage review compares the ER-OLEDM0.91-1 I2C OLED’s documented 3–5V operating range against direct nominal Uno/Nano rails with a common board ground reference. It does not propagate voltage through parts. LCD-016N002L remains unverified because its symbol does not identify the 3V/5V variant. Unknown supplies, conflicting metadata and unknown parts stay unverified; an in-range nominal supply does not prove operation or signal compatibility.
 - Direct power tracing shows pins sharing a known board rail. It stops at parts;
   it does not treat a resistor or common ground as a proven power dependency.
 - **Trace a connection:** choose any two exported pins in your uploaded circuit.

@@ -32,6 +32,9 @@ These groups use HAS_PIN and ON_NET for structural grouping, including shared gr
 they do not imply conduction through a part. Separate groups can be intentional.
 Without an identified board, no group is assumed to be the main circuit.
 A connected required pin is not proof of correct voltage or a powered, working part.
+check_rules.voltage compares verified operating ranges with nominal board supplies.
+within_range means only the nominal supply is in range, never that the circuit is safe or works.
+unverified is not a fault; do not infer LCD variant voltage or signal tolerance from supply ratings.
 Use find_path for routes between two exact exported pins. It follows wires and known resistors
 only, up to 32 graph steps. A missing route is not proof of a fault: other component internals
 are not modeled. A found route is not proof of current flow. Never infer internal MCU paths.

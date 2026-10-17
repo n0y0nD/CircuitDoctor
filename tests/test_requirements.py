@@ -56,7 +56,7 @@ class RequiredPinTests(unittest.TestCase):
                     self.assertEqual(r['summary']['warnings'], 0)
                     self.assertEqual(r['requirements']['connected_pins'], 2)
                     self.assertEqual(r['requirements']['checked_pins'], 2)
-                    self.assertEqual(r['queries'][-1]['cypher'], REQUIRED_QUERY)
+                    self.assertTrue(any(q['cypher'] == REQUIRED_QUERY for q in r['queries']))
                     self.assertNotIn('HAS_PIN', r['queries'][-1]['cypher'])
                     self.assertTrue(r['requirements']['recognized_parts'][0]['sources'])
                     ground = next(p for p in r['requirements']['pins'] if p['pin'] == '1')

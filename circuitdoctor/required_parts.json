@@ -1,11 +1,15 @@
 {
-  "version": 1,
+  "version": 2,
   "verified_on": "2026-10-18",
-  "scope": "Required logic power and ground pins only; no voltage, current, signal or backlight requirements.",
+  "scope": "Required logic supply/ground pins; nominal supply range only where the exact variant is verified. No signal, current or backlight limits.",
   "parts": [
     {
       "match": {"lib": "Display_Graphic", "part": "ER_OLEDM0.91_1x-I2C"},
       "name": "0.91-inch I2C OLED (ER-OLEDM0.91-1)",
+      "voltage": {
+        "power_pin": "2", "ground_pin": "1", "min": 3.0, "max": 5.0,
+        "sources": [{"title": "EastRising ER-OLEDM0.91-1 datasheet, section 4.4 (operating supply, not absolute maximum)", "url": "https://www.buydisplay.com/download/manual/ER-OLEDM0.91-1_Datasheet.pdf"}]
+      },
       "pins": [
         {"number": "1", "names": ["GND"], "role": "ground"},
         {"number": "2", "names": ["VCC"], "role": "power"}
@@ -15,6 +19,7 @@
     {
       "match": {"lib": "Display_Character", "part": "LCD-016N002L"},
       "name": "16×2 character LCD (LCD-016N002L)",
+      "voltage_unverified": "This LCD symbol covers 3V and 5V variants. The exact voltage variant is not identified by the symbol; check the module datasheet and ordering code.",
       "pins": [
         {"number": "1", "names": ["VSS"], "role": "ground"},
         {"number": "2", "names": ["VDD"], "role": "power"}
