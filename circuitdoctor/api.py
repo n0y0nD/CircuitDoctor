@@ -15,6 +15,7 @@ from .storage import AmbiguousConnection, ConnectionNotFound, CircuitNotFound, S
 from .tools import explain_net
 from .review import check_rules
 from .power import trace_power
+from .paths import find_path
 from .chat import ask_circuit, chat_status, ChatError, CHAT_LOCK
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -132,6 +133,22 @@ def power_trace(circuit_id: str, selection: ExplainRequest):
         raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+class PathRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    from_ref: str = Field(min_length=1, max_length=512)
+    from_pin: str = Field(min_length=1, max_length=512)
+    to_ref: str = Field(min_length=1, max_length=512)
+    to_pin: str = Field(min_length=1, max_length=512)
+
+
+@app.post("/api/circuits/{circuit_id}/path")
+def connection_path(circuit_id: str, selection: PathRequest):
+    try:
+        return find_path(get_store(), circuit_id, **selection.model_dump())
+    except ConnectionNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 class ChatMessage(BaseModel):

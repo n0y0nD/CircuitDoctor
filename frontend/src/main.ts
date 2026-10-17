@@ -1,5 +1,6 @@
 import "@fontsource-variable/inter";
 import "./style.css";
+import { PathPanel } from "./path-panel";
 import { ChatPanel } from "./chat-panel";
 import type { Explanation } from "./explanation";
 import { renderConnectionExplanation } from "./connection-explanation";
@@ -83,6 +84,7 @@ $("#app").innerHTML = `
       <div class="review-heading"><div><h2>Check your connections</h2><p>See what needs attention, then select it to see the wiring.</p></div><button id="run-review" class="button primary">Run review</button></div>
       <div id="review-results" aria-live="polite"></div>
     </section>
+    <section id="path-panel" class="path-panel" aria-label="Connection route" hidden></section>
     <div class="workbench">
       <section class="explorer-panel" aria-label="Circuit explorer">
         <div class="explorer-toolbar"><div class="view-tabs" role="tablist" aria-label="Circuit views">
@@ -106,20 +108,29 @@ $("#app").innerHTML = `
 <dialog id="help-dialog" aria-labelledby="help-title"><button class="icon-button dialog-close" id="close-help" aria-label="Close help">${icon("close")}</button><h2 id="help-title">Export your circuit from KiCad</h2><ol><li>Open your circuit in the schematic editor.</li><li>Select <strong>File → Export → Netlist</strong>.</li><li>Choose the <strong>KiCad</strong> format and save the <strong>.net</strong> file.</li><li>Upload that file here to explore its connections.</li></ol><p>Uploads are stored in your local database. Images, PCB files and schematics cannot be uploaded directly.</p><button class="button primary" id="got-it">Got it</button></dialog>
 <div id="toast" class="toast" role="status" hidden></div>`;
 
-const chatPanel = new ChatPanel($("#chat-panel"), evidence => {
+function showEvidence(evidence: Explanation["evidence"] | null, reveal = false) {
   clearExplanation();
   selectedFinding = null;
-  chatEvidence = { evidence };
+  chatEvidence = evidence ? { evidence } : null;
+  if (!evidence) { renderInspector(); return; }
   view = "graph";
   query = "";
   $("#search").setAttribute("value", "");
   $<HTMLInputElement>("#search").value = "";
-  showUnused = true;
-  $<HTMLInputElement>("#unused-toggle").checked = true;
+  if (circuit) {
+    const visible = new Set(visibleNets(circuit, showUnused, selection).map(n => `n:${n.code}`));
+    if (evidence.nodes.some(n => n.kind === "net" && !visible.has(n.id))) showUnused = true;
+  }
+  $<HTMLInputElement>("#unused-toggle").checked = showUnused;
   renderView();
   renderInspector();
+  if (reveal) $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+const chatPanel = new ChatPanel($("#chat-panel"), evidence => {
+  showEvidence(evidence);
   $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
 });
+const pathPanel = new PathPanel($("#path-panel"), showEvidence);
 
 function connectionState(online: boolean) {
   const element = $("#connection-status");
@@ -160,6 +171,7 @@ async function readCircuit(
   clearReview();
   renderExplanation();
   chatPanel.setCircuit("");
+  pathPanel.setCircuit(null);
   const currentRequest = ++requestId;
   setBusy(true);
   notice();
@@ -192,6 +204,7 @@ async function readCircuit(
     clearReview();
     circuit = result;
     chatPanel.setCircuit(result.storage.circuit_id);
+    pathPanel.setCircuit(result);
     filename = result.storage.filename || name;
     history.replaceState(null, "", `#circuit=${result.storage.circuit_id}`);
     view = "graph";
@@ -212,7 +225,7 @@ async function readCircuit(
     notice(
       `${message}${circuit ? " Your previous circuit is still displayed." : ""}`,
     );
-    if (circuit) chatPanel.setCircuit(circuit.storage.circuit_id);
+    if (circuit) { chatPanel.setCircuit(circuit.storage.circuit_id); pathPanel.setCircuit(circuit); }
     if (error instanceof TypeError) connectionState(false);
   } finally {
     if (currentRequest === requestId) setBusy(false);
@@ -537,6 +550,7 @@ document.addEventListener("keydown", event => {
 $("#clear-circuit").onclick = () => {
   setExpanded(false);
   chatPanel.setCircuit("");
+  pathPanel.setCircuit(null);
   clearExplanation();
   clearReview();
   requestId++; // Discard any pending response without deleting stored data.

@@ -1,6 +1,7 @@
 """Store independent circuit graphs and reconstruct connectivity with Cypher.
 
-Only the loader writes. Reads follow HAS_PIN / ON_NET relationships; they never
+The loader stores imports; path tracing adds derived resistor THROUGH edges.
+Reads follow HAS_PIN / ON_NET relationships; they never
 return a cached parser result. Library metadata is preserved separately and is
 not treated as evidence that a pin is connected.
 """

@@ -74,7 +74,16 @@ the host port in `compose.yaml`. Website: 8080; database: 6379; database viewer:
   symbols. Findings include the relevant connections and board specification sources.
 - Direct power tracing shows pins sharing a known board rail. It stops at parts;
   it does not treat a resistor or common ground as a proven power dependency.
-- Gemini calls `circuit_overview`, `explain_net`, `check_rules` and `trace_power`.
+- **Trace a connection:** choose any two exported pins in your uploaded circuit.
+  FalkorDB computes a bounded `shortestPath` over `ON_NET` and derived resistor
+  `THROUGH` edges. The UI lists the steps and highlights only route memberships.
+  Resistor passages require exact `Device:R` / `Device:R_Small` identities and two
+  exported pins; MCU, display, diode and other internal paths are not inferred.
+  Searches stop at 32 graph edges with a five-second query timeout. No route is
+  not a fault verdict, and a route does not prove current flow or operation.
+  Existing saved graphs are enriched when tracing, without changing the export.
+- Gemini calls `circuit_overview`, `explain_net`, `check_rules`, `trace_power`
+  and `find_path`.
   Responses expose their graph evidence and queries; supported evidence can be
   highlighted in the circuit. Requests are bounded to five model calls/eight tool
   calls, with quota errors returned without automatic retries.
