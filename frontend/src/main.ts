@@ -403,7 +403,7 @@ async function explainSelection(mode: "explain" | "power-trace" = "explain") {
 }
 
 function sourceLinks(sources: { title: string; url: string }[]) {
-  return sources.filter(source => source.url.startsWith("https://docs.arduino.cc/")).map(source => `<a class="spec-source" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)} ↗</a>`).join("");
+  return sources.filter(source => ["https://docs.arduino.cc/", "https://www.buydisplay.com/", "https://www.vishay.com/", "https://github.com/KiCad/kicad-symbols/"].some(prefix => source.url.startsWith(prefix))).map(source => `<a class="spec-source" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)} ↗</a>`).join("");
 }
 function renderReview() {
   const button = $<HTMLButtonElement>("#run-review");
@@ -418,22 +418,26 @@ function renderReview() {
   const information = result.findings.filter(f => f.severity === "info");
   const unconnected = information.filter(f => f.rule === "single_pin_net" || f.rule === "unassigned_pin");
   const other = information.filter(f => !unconnected.includes(f));
-  const heading = result.status === "incomplete" ? "Not enough information to check this circuit" : warnings.length ? `${warnings.length} wiring problem${warnings.length === 1 ? "" : "s"} to check` : result.electrical.checked_nets ? "No Arduino power-wire conflicts found" : "No supported power connections to check";
+  const required = result.requirements;
+  const uncertainRequirements = (required?.unverified_pins.length || 0) + (required?.skipped_pins.length || 0);
+  const heading = result.status === "incomplete" ? "Not enough information to check this circuit" : warnings.length ? `${warnings.length} wiring problem${warnings.length === 1 ? "" : "s"} to check` : uncertainRequirements ? "Some power/ground connections need a closer look" : required?.checked_pins ? "No issues found in the supported wiring checks" : result.electrical.checked_nets ? "No Arduino power-wire conflicts found" : "No supported power connections to check";
   const connectionFor = (f: Finding) => {
     const selector = f.selection;
     const net = 'net_code' in selector ? circuit?.nets.find(n => n.code === selector.net_code) : null;
     return net && circuit ? connectionLabel(circuit, net) : 'ref' in selector ? `${selector.ref} · Pin ${selector.pin}` : f.title;
   };
   panel.innerHTML = `<h3 class="review-summary">${esc(heading)}</h3>
-    <p class="review-note">Checks Arduino power and ground wiring. Display, sensor and other component requirements are not checked yet.</p>
-    ${warnings.length ? `<div class="finding-list">${warnings.map(f => `<button class="finding-card warning" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(connectionFor(f))}</p><p><b>What to do:</b> ${esc(f.suggestion)}</p><small>Show this connection →</small></button>`).join("")}</div>` : ""}
+    <p class="review-note">Checks Arduino power wiring and required power/GND pins for recognized parts. Other parts may need checks we cannot perform yet.</p>
+    ${warnings.length ? `<div class="finding-list">${warnings.map(f => `<button class="finding-card warning" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(connectionFor(f))}</p>${f.rule.startsWith("required_") ? `<p>${esc(f.message)}</p>` : ""}<p><b>What to do:</b> ${esc(f.suggestion)}</p><small>Show this connection →</small></button>`).join("")}</div>` : ""}
     ${unconnected.length ? `<details class="review-details"><summary>${unconnected.length} pins with no connection</summary><p>These may be intentional. Select a pin to check whether your design needs it.</p><div class="unconnected-list">${unconnected.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(connectionFor(f))}<span>Show pin →</span></button>`).join("")}</div></details>` : ""}
     <details class="review-details"><summary>Check details</summary>
       ${other.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(f.title)}<span>Show details →</span></button>`).join("")}
       <p>${result.summary.marked_unused_pins} pins marked intentionally unused in the file.</p>
       <p>${result.electrical.checked_nets} power/ground nets checked. ${esc(result.electrical.checks.join("; "))}.</p>
       ${result.electrical.recognized_parts.map(part => `<p><strong>${esc(part.ref)} · ${esc(part.name)}</strong></p>${sourceLinks(part.sources)}`).join("")}
-      ${result.electrical.unknown_components.length ? `<p>No electrical specifications for: ${esc(result.electrical.unknown_components.join(", "))}.</p>` : ""}
+      ${required?.recognized_parts.length ? `<p><strong>Required power/GND connections</strong>: ${required.checked_pins} pins checked; ${required.connected_pins} have a direct wire route to a known Arduino supply/ground pin. This does not verify voltage or operation.</p>${required.recognized_parts.map(part => `<p>${esc(part.ref)} · ${esc(part.name)}</p>${sourceLinks(part.sources)}`).join("")}` : ""}
+      ${required ? [...required.unverified_pins, ...required.skipped_pins].map(pin => `<p><strong>${esc(pin.ref)} · Pin ${esc(pin.pin)}:</strong> ${esc(pin.reason)}</p>`).join("") : ""}
+      ${result.electrical.unknown_components.length ? `<p>No voltage/current checks for: ${esc(result.electrical.unknown_components.join(", "))}.</p>` : ""}
       ${result.cannot_verify.map(item => `<p><strong>${esc(item.check)}:</strong> ${esc(item.reason)}</p>`).join("")}
     </details>`;
 }

@@ -72,6 +72,12 @@ the host port in `compose.yaml`. Website: 8080; database: 6379; database viewer:
 - Review finds unmarked single-pin connections and direct power-to-ground or
   different nominal-voltage rail conflicts for identified **Uno R3 / classic Nano**
   symbols. Findings include the relevant connections and board specification sources.
+- Required power/GND checks use exact, source-backed part identities in
+  `circuitdoctor/required_parts.json` (currently ER-OLEDM0.91-1 I2C OLED and
+  LCD-016N002L). FalkorDB checks each required pin’s wire neighbours and routes
+  to known Arduino rails/ground. A required pin with no connected peer gets a
+  warning and pin evidence; other supply arrangements remain unverified.
+  Corrected uploads are checked independently. No voltage compatibility is inferred.
 - Direct power tracing shows pins sharing a known board rail. It stops at parts;
   it does not treat a resistor or common ground as a proven power dependency.
 - **Trace a connection:** choose any two exported pins in your uploaded circuit.

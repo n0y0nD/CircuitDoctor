@@ -17,6 +17,12 @@ export interface Review {
   scope: 'connectivity_and_board_rails';
   status: 'incomplete' | 'warnings' | 'no_warnings';
   electrical: { recognized_parts: { ref: string; name: string; sources: { title: string; url: string }[] }[]; unknown_components: string[]; matched_power_pins: number; checked_nets: number; checks: string[]; conflicting_pin_metadata: { ref: string; pin: string }[] };
+  requirements?: {
+    recognized_parts: { ref: string; name: string; sources: { title: string; url: string }[] }[];
+    checked_pins: number; connected_pins: number; missing_pins: number;
+    unverified_pins: { ref: string; pin: string; name: string; reason: string }[];
+    skipped_pins: { ref: string; pin: string; reason: string }[];
+  };
   summary: { components: number; nets: number; pins: number; warnings: number; information: number; marked_unused_pins: number; unknown_pin_names: number; unknown_pin_types: number };
   findings: Finding[];
   cannot_verify: { check: string; reason: string }[];

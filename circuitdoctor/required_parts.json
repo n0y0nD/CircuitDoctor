@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "verified_on": "2026-10-18",
+  "scope": "Required logic power and ground pins only; no voltage, current, signal or backlight requirements.",
+  "parts": [
+    {
+      "match": {"lib": "Display_Graphic", "part": "ER_OLEDM0.91_1x-I2C"},
+      "name": "0.91-inch I2C OLED (ER-OLEDM0.91-1)",
+      "pins": [
+        {"number": "1", "names": ["GND"], "role": "ground"},
+        {"number": "2", "names": ["VCC"], "role": "power"}
+      ],
+      "sources": [{"title": "EastRising ER-OLEDM0.91-1 datasheet, section 4.1", "url": "https://www.buydisplay.com/download/manual/ER-OLEDM0.91-1_Datasheet.pdf"}]
+    },
+    {
+      "match": {"lib": "Display_Character", "part": "LCD-016N002L"},
+      "name": "16×2 character LCD (LCD-016N002L)",
+      "pins": [
+        {"number": "1", "names": ["VSS"], "role": "ground"},
+        {"number": "2", "names": ["VDD"], "role": "power"}
+      ],
+      "sources": [{"title": "Vishay LCD-016N002L1 datasheet, interface pin functions", "url": "https://www.vishay.com/docs/37299/37299.pdf"}, {"title": "KiCad LCD-016N002L symbol pin mapping", "url": "https://github.com/KiCad/kicad-symbols/blob/master/Display_Character.lib"}]
+    }
+  ]
+}
