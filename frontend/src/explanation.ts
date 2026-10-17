@@ -1,4 +1,4 @@
-import type { Selection } from './types';
+import type { Circuit, Selection } from './types';
 import type { ExplainedNet, ExplainedPin } from './connection-explanation.ts';
 
 export interface Explanation {
@@ -67,4 +67,20 @@ export class ExplanationRequest {
 export function evidenceMemberships(result: Pick<Explanation, 'evidence'>) {
   return new Set(result.evidence.edges.filter(edge => edge.type === 'ON_NET')
     .map(edge => JSON.stringify([edge.source, edge.target])));
+}
+
+// A one-pin finding can concern a pin with no net membership at all.
+export function singleEvidencePin(circuit: Circuit, evidence: Explanation['evidence']): Selection | null {
+  const pins = evidence.nodes.filter(node => node.kind === 'pin');
+  if (pins.length !== 1 || !pins[0].id.startsWith('p:')) return null;
+  try {
+    const pair: unknown = JSON.parse(pins[0].id.slice(2));
+    if (!Array.isArray(pair) || pair.length !== 2 || !pair.every(value => typeof value === 'string')) return null;
+    const [ref, pin] = pair;
+    const component = circuit.components.find(part => part.ref === ref);
+    if (!component) return null;
+    const known = circuit.nets.some(net => net.nodes.some(node => node.ref === ref && node.pin === pin)) ||
+      circuit.libparts.some(part => part.lib === component.libsource.lib && part.part === component.libsource.part && part.pins.some(p => p.num === pin));
+    return known ? { kind: 'pin', id: pins[0].id, ref, pin } : null;
+  } catch { return null; }
 }

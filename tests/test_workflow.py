@@ -68,4 +68,4 @@ class UploadedCircuitWorkflowTests(unittest.TestCase):
                     for item in result['evidence']:
                         self.assertEqual(item['result']['circuit_id'], cid)
                         self.assertEqual(item['result']['source'], 'falkordb')
-                    self.assertEqual(result['evidence'][2]['result']['evidence'], trace.json()['evidence'])
+                    self.assertEqual(next(e['result']['evidence'] for e in result['evidence'] if e['tool'] == 'trace_power'), trace.json()['evidence'])

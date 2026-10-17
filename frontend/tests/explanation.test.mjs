@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ExplanationRequest, explanationSelector, evidenceMemberships } from '../src/explanation.ts';
+import { ExplanationRequest, explanationSelector, evidenceMemberships, singleEvidencePin } from '../src/explanation.ts';
 
 const result = (id) => ({ source: 'falkordb', circuit_id: id, summary: 'Connections from graph', evidence: { nodes: [], edges: [], paths: [] } });
 const response = (data, status = 200) => new Response(JSON.stringify(data), { status });
@@ -82,4 +82,15 @@ test('power trace handles unsupported pins, outages, and wrong tool responses', 
   for (let i = 0; i < 3; i++) await request.run('current', { kind: 'net', id: '007' }, s => states.push(s), 'power-trace');
   assert.deepEqual(states.map(s => s.status), ['loading', 'error', 'loading', 'error', 'loading', 'error']);
   assert.equal(states[1].message, 'Select a known power pin');
+});
+
+test('missing-pin evidence selects the exact exported pin even without a net, for any component', () => {
+  const circuit = { components: [{ ref: 'SCREEN9', libsource: { lib: 'Custom', part: 'Screen' } }],
+    libparts: [{ lib: 'Custom', part: 'Screen', pins: [{ num: '007', name: 'GND' }] }], nets: [] };
+  const evidence = { nodes: [{ kind: 'component', id: 'c:SCREEN9' }, { kind: 'pin', id: 'p:["SCREEN9","007"]' }], edges: [], paths: [] };
+  assert.deepEqual(singleEvidencePin(circuit, evidence), { kind: 'pin', id: 'p:["SCREEN9","007"]', ref: 'SCREEN9', pin: '007' });
+  for (const id of ['p:bad', 'p:["SCREEN9","7"]', 'p:["OTHER","007"]', 'p:["SCREEN9",7]']) {
+    assert.equal(singleEvidencePin(circuit, { ...evidence, nodes: [{ kind: 'pin', id }] }), null);
+  }
+  assert.equal(singleEvidencePin(circuit, { ...evidence, nodes: [...evidence.nodes, { kind: 'pin', id: 'p:["OTHER","1"]' }] }), null);
 });

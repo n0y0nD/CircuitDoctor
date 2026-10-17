@@ -90,6 +90,21 @@ export class CircuitGraph {
         elements.push({data:{id:`lead:${id}`,source:anchor,target:id,kind:'lead',ref:pin.ref,pinId:id,color:'#8b9b9d'}});
       });
     }
+    // A missing-connection finding has no ON_NET edge. Still show its exact
+    // selected terminal, without inventing a wire or exposing every unused pin.
+    if (selection?.kind === 'pin' && !ports.has(selection.id)) {
+      const component = circuit.components.find(part => part.ref === selection.ref);
+      const library = circuit.libparts.find(part => part.lib === component?.libsource.lib && part.part === component?.libsource.part);
+      const pin = library?.pins.find(pin => pin.num === selection.pin);
+      const pos = positions.get(selection.ref);
+      if (component && pin && pos) {
+        const socket = drawings.get(selection.ref)?.ports.get(selection.pin);
+        const x = socket ? pos.x-pos.width/2+socket.x : pos.x+pos.width/2+25;
+        const y = socket ? pos.y-pos.height/2+socket.y : pos.y;
+        elements.push({data:{id:selection.id,kind:'pin',ref:selection.ref,pin:selection.pin,
+          label:`${pin.num} · ${pin.name} (unconnected)`,search:`${selection.ref} ${pin.num} ${pin.name}`.toLowerCase()},position:{x,y}});
+      }
+    }
     const bottom = Math.max(0,...Array.from(positions.values()).map(p=>p.y+p.height/2))+85;
     nets.forEach((net,index)=>{
       const points = net.nodes.map(p=>ports.get(pinId(p.ref,p.pin))!).filter(Boolean);

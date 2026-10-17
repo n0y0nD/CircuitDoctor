@@ -128,10 +128,10 @@ class PathTests(unittest.TestCase):
         args = {'from_ref': 'BOARD9', 'from_pin': '007', 'to_ref': 'MODULEΩ', 'to_pin': 'VCC'}
         replies = [
             {'candidates': [{'content': {'role': 'model', 'parts': [{'functionCall': {'name': 'find_path', 'args': args}}]}}]},
-            {'candidates': [{'content': {'role': 'model', 'parts': [{'text': 'A route goes through Z17 and Z23 [E1].'}]}, 'finishReason': 'STOP'}]},
+            {'candidates': [{'content': {'role': 'model', 'parts': [{'text': 'A route goes through Z17 and Z23 [E2].'}]}, 'finishReason': 'STOP'}]},
         ]
         with patch('circuitdoctor.chat.api_key', return_value='test-only-key'), patch('circuitdoctor.chat.generate', side_effect=replies):
             result = ask_circuit(self.store, cid, 'Find the connection route')
         self.assertEqual(result['tool_calls'], 1)
-        self.assertEqual(result['evidence'][1]['tool'], 'find_path')
-        self.assertEqual(result['evidence'][1]['result']['status'], 'found')
+        self.assertEqual(result['evidence'][2]['tool'], 'find_path')
+        self.assertEqual(result['evidence'][2]['result']['status'], 'found')

@@ -33,6 +33,7 @@ def store_fixture():
         'component_count': 1, 'nets': [net], 'pins': [pin], 'unassigned_pins': [], 'queries': []}
     store.connection_facts.return_value = {'source': 'falkordb', 'circuit_id': CID,
         'selected_pin': pin, 'nets': [net], 'queries': [{'cypher': 'MATCH (n) RETURN n', 'parameters': {}}]}
+    store.db.select_graph.return_value.ro_query.return_value.result_set = [[0, ['A1']]]
     return store
 
 
@@ -45,16 +46,31 @@ class ChatTests(unittest.TestCase):
 
     def test_loop_preserves_signature_and_returns_real_evidence(self):
         content = reply([{'functionCall': {'name': 'explain_net', 'args': {'ref': 'A1', 'pin': '28'}, 'id': 'call-1'}, 'thoughtSignature': 'test-signature'}])
-        with patch('circuitdoctor.chat.generate', side_effect=[content, reply([{'text': 'D13 is on signal [E1].'}])]) as generate:
+        with patch('circuitdoctor.chat.generate', side_effect=[content, reply([{'text': 'D13 is on signal [E2].'}])]) as generate:
             result = chat.ask_circuit(self.store, CID, 'What is connected to D13?')
         self.assertEqual(result['tool_calls'], 1)
-        self.assertEqual(result['evidence'][1]['result']['evidence']['paths'], [['c:A1', 'p:["A1","28"]', 'n:007']])
+        self.assertEqual(result['evidence'][2]['result']['evidence']['paths'], [['c:A1', 'p:["A1","28"]', 'n:007']])
         contents = generate.call_args.args[0]['contents']
         self.assertIn(content['candidates'][0]['content'], contents)
         self.assertEqual(contents[-1]['parts'][0]['functionResponse']['id'], 'call-1')
-        self.assertEqual(contents[-1]['parts'][0]['functionResponse']['response']['evidence_id'], 'E1')
+        self.assertEqual(contents[-1]['parts'][0]['functionResponse']['response']['evidence_id'], 'E2')
         self.store.connection_facts.assert_called_once_with(CID, net_code=None, net_name=None, ref='A1', pin='28')
         self.assertNotIn(FAKE_KEY, json.dumps(generate.call_args.args[0]))
+
+    def test_review_evidence_exists_even_when_model_calls_no_tools(self):
+        with patch('circuitdoctor.chat.generate', return_value=reply([{'text': 'No confirmed fault [E1].'}])) as generate:
+            result = chat.ask_circuit(self.store, CID, 'Why does my display not work?')
+        self.assertEqual(result['evidence'][1]['tool'], 'check_rules')
+        self.assertEqual(result['evidence'][1]['result']['circuit_id'], CID)
+        context = generate.call_args.args[0]['contents'][0]['parts']
+        self.assertIn('Fresh check_rules evidence [E1]', context[1]['text'])
+        self.assertIn('"warnings": 0', context[1]['text'])
+
+    def test_failed_review_never_sends_unreviewed_circuit_to_provider(self):
+        with patch('circuitdoctor.chat.check_rules', side_effect=StorageUnavailable('review offline')), patch('circuitdoctor.chat.generate') as generate:
+            with self.assertRaises(StorageUnavailable):
+                chat.ask_circuit(self.store, CID, 'Why is it not working?')
+        generate.assert_not_called()
 
     def test_model_cannot_change_circuit_or_execute_arbitrary_code(self):
         for name, args in [('execute_cypher', {'query': 'DELETE n'}), ('explain_net', {'net_code': '007', 'circuit_id': 'b'*32}), ('check_rules', {'extra': True}), ('explain_net', [])]:
@@ -66,7 +82,7 @@ class ChatTests(unittest.TestCase):
         self.store.connection_facts.side_effect = ConnectionNotFound('No matching pin')
         with patch('circuitdoctor.chat.generate', side_effect=[reply([{'functionCall': {'name': 'explain_net', 'args': {'ref': 'A1', 'pin': '13'}}}]), reply([{'text': 'That exported pin was not found.'}])]) as generate:
             result = chat.ask_circuit(self.store, CID, 'Pin 13?')
-        self.assertEqual(len(result['evidence']), 1)
+        self.assertEqual(len(result['evidence']), 2)
         self.assertIn('error', generate.call_args.args[0]['contents'][-1]['parts'][0]['functionResponse']['response'])
 
     def test_missing_database_or_circuit_never_calls_provider(self):

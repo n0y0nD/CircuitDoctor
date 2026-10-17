@@ -6,7 +6,7 @@ import type { Explanation } from "./explanation";
 import { renderConnectionExplanation } from "./connection-explanation";
 import { icon } from "./icons";
 import { CircuitGraph } from "./graph";
-import { ExplanationRequest, type ExplanationState } from "./explanation";
+import { ExplanationRequest, singleEvidencePin, type ExplanationState } from "./explanation";
 import { ReviewRequest, type ReviewState, type Finding } from "./review";
 import {
   componentKind,
@@ -118,6 +118,7 @@ function showEvidence(evidence: Explanation["evidence"] | null, reveal = false) 
   $("#search").setAttribute("value", "");
   $<HTMLInputElement>("#search").value = "";
   if (circuit) {
+    selection = singleEvidencePin(circuit, evidence) || selection;
     const visible = new Set(visibleNets(circuit, showUnused, selection).map(n => `n:${n.code}`));
     if (evidence.nodes.some(n => n.kind === "net" && !visible.has(n.id))) showUnused = true;
   }
@@ -353,7 +354,7 @@ function renderInspector() {
     const selected = selection;
     const member = circuit.nets.flatMap(net => net.nodes).find(p => p.ref === selected.ref && p.pin === selected.pin);
     const nets = circuit.nets.filter(net => net.nodes.some(p => p.ref === selected.ref && p.pin === selected.pin));
-    $("#inspector-body").innerHTML = `<div class="component-heading"><span class="component-symbol">${icon("chip", 25)}</span><div><span class="component-ref">${esc(selected.ref)} · PIN ${esc(selected.pin)}</span><h4>${esc(member ? pinName(circuit, member) : `Pin ${selected.pin}`)}</h4></div></div><p class="inspector-description">Follow this pin’s connections in your uploaded circuit.</p><div class="pin-list">${nets.map(net => `<button class="pin-row" data-net="${esc(net.code)}">${icon("net", 16)}<span><strong>${esc(connectionLabel(circuit!, net))}</strong><small>See connected pins</small></span>${icon("chevron", 13)}</button>`).join("")}<button class="text-button" data-component="${esc(selected.ref)}">Back to ${esc(selected.ref)}</button></div>`;
+    $("#inspector-body").innerHTML = `<div class="component-heading"><span class="component-symbol">${icon("chip", 25)}</span><div><span class="component-ref">${esc(selected.ref)} · PIN ${esc(selected.pin)}</span><h4>${esc(pinName(circuit, member || { ref: selected.ref, pin: selected.pin, pinfunction: "unknown", pintype: "unknown" }))}</h4></div></div><p class="inspector-description">${nets.length ? "Follow this pin’s connections in your uploaded circuit." : "This pin has no wire connection in the uploaded file."}</p><div class="pin-list">${nets.map(net => `<button class="pin-row" data-net="${esc(net.code)}">${icon("net", 16)}<span><strong>${esc(connectionLabel(circuit!, net))}</strong><small>See connected pins</small></span>${icon("chevron", 13)}</button>`).join("")}<button class="text-button" data-component="${esc(selected.ref)}">Back to ${esc(selected.ref)}</button></div>`;
   } else if (selection.kind === "component") {
     const comp = circuit.components.find((c) => c.ref === selection!.id);
     if (!comp) return;
