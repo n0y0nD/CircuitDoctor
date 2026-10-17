@@ -87,7 +87,6 @@ export class PathPanel {
     if (state.status !== 'success') return;
     const r = state.result;
     output.innerHTML = `<p><strong>${esc(r.summary)}</strong></p>
-      ${r.status === 'found' ? `<ol class="path-steps">${r.steps.map((step, i) => `<li>${esc(step.kind === 'net' ? 'Wire: ' + step.label : step.label)}${i > 0 && step.kind === 'pin' && r.steps[i - 1].kind === 'pin' ? '<small>through resistor</small>' : ''}</li>`).join('')}</ol><button type="button" class="button secondary" data-show-route>Show route on circuit</button>` : ''}
-      <details class="path-proof"><summary>How this route was checked</summary><p>${esc(r.limitations.join(' '))}</p><p>FalkorDB finds the shortest route in the supported connection model.</p>${r.queries.map(q => `<pre>${esc(q.cypher)}\n${esc(JSON.stringify(q.parameters, null, 2))}</pre>`).join('')}</details>`;
+      ${r.status === 'found' ? `<ol class="path-steps">${r.steps.map((step, i) => `<li>${esc(step.kind === 'net' ? 'Wire: ' + step.label : step.label)}${i > 0 && step.kind === 'pin' && r.steps[i - 1].kind === 'pin' ? '<small>through resistor</small>' : ''}</li>`).join('')}</ol><button type="button" class="button secondary" data-show-route>Show route on circuit</button>` : ''}`;
   }
 }

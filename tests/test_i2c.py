@@ -73,7 +73,7 @@ class I2CTests(unittest.TestCase):
             self.assertEqual(len(findings), 1)
             self.assertEqual(findings[0]['selection'], {'ref': 'PANEL9', 'pin': '4'})
             self.assertIn('p:["PANEL9","4"]', [n['id'] for n in findings[0]['evidence']['nodes']])
-            self.assertFalse(any(f['severity'] == 'info' and f['selection'] == findings[0]['selection'] for f in r['findings']))
+            self.assertFalse(any(f['rule'] in ('single_pin_net', 'unassigned_pin') and f['selection'] == findings[0]['selection'] for f in r['findings']))
 
     def test_joined_lines_are_not_reported_as_correct_even_with_matching_anchors(self):
         data = signal_circuit()
@@ -89,7 +89,7 @@ class I2CTests(unittest.TestCase):
             data['components'][1]['value'] = 'I2C OLED SDA SCL'
             r = self.review(data)
             self.assertEqual(r['i2c']['checks'], [])
-            self.assertFalse(any(f['rule'].startswith('i2c_') for f in r['findings']))
+            self.assertFalse(any(f['rule'].startswith('i2c_') and f['severity'] == 'warning' for f in r['findings']))
 
     def test_missing_and_conflicting_device_metadata_or_renumbered_pin_are_unverified(self):
         for mode in ('conflict', 'absent', 'unknown', 'renumbered'):
@@ -107,7 +107,7 @@ class I2CTests(unittest.TestCase):
                 data['nets'][2]['nodes'][1]['pin'] = '44'
             r = self.review(data)
             self.assertEqual(next(p for p in r['i2c']['checks'] if p['signal'] == 'SDA')['status'], 'unverified', mode)
-            self.assertFalse(any(f['rule'].startswith('i2c_') for f in r['findings']))
+            self.assertFalse(any(f['rule'].startswith('i2c_') and f['severity'] == 'warning' for f in r['findings']))
 
     def test_software_i2c_unknown_board_conflicting_metadata_and_intermediate_parts_not_faults(self):
         for mode in ('software', 'unknown_board', 'conflict', 'renumbered', 'resistor'):
@@ -128,7 +128,7 @@ class I2CTests(unittest.TestCase):
                 data['nets'].append({'code': '200', 'name': 'SDA', 'nodes': [board_pin, {'ref': 'LIMITER', 'pin': '2', 'pinfunction': 'unknown', 'pintype': 'passive'}]})
             r = self.review(data)
             self.assertEqual(next(p for p in r['i2c']['checks'] if p['signal'] == 'SDA')['status'], 'unverified', mode)
-            self.assertFalse(any(f['rule'].startswith('i2c_') for f in r['findings']))
+            self.assertFalse(any(f['rule'].startswith('i2c_') and f['severity'] == 'warning' for f in r['findings']))
 
     def test_multiple_devices_on_same_bus_do_not_create_false_warnings(self):
         data = signal_circuit()

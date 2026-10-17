@@ -1,6 +1,6 @@
 """Source-backed I2C signal checks on direct FalkorDB wire routes.
 
-Hardware pin correspondence only: no firmware, pull-up or logic-level verdicts.
+Hardware pin correspondence only; pull-up topology is inspected separately.
 """
 from redis.exceptions import RedisError
 
@@ -120,4 +120,4 @@ def i2c_review(store, circuit_id, facts):
     return {'findings': findings, 'queries': queries, 'coverage': {
         'checks': results, 'checked_pins': len(checks),
         'unverified_pins': sum(p['status'] == 'unverified' for p in results),
-        'scope': 'Exact catalog parts and consistent symbol pin IDs/names; direct wires to Uno R3/classic Nano hardware I2C. Software I2C, pull-ups, logic levels, addresses and communication are not verified.'}}
+        'scope': 'Exact catalog parts and consistent symbol pin IDs/names; direct wires to Uno R3/classic Nano hardware I2C. Software I2C, logic levels, addresses and communication are not verified. External pull-up topology is inspected separately.'}}

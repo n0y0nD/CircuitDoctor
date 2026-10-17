@@ -33,6 +33,10 @@ export interface Review {
     status: 'connected' | 'mismatch' | 'joined' | 'unconnected' | 'unverified';
     message: string; sources: { title: string; url: string }[];
   }[] };
+  pullups?: { external_paths: number; scope: string; checks: {
+    ref: string; pin: string; signal: 'SDA' | 'SCL'; status: 'external_path_found' | 'unverified';
+    message: string; sources: { title: string; url: string }[];
+  }[] };
   isolation?: { algorithm: string; group_count: number; separate_groups: number; board_refs: string[]; scope: string };
   summary: { components: number; nets: number; pins: number; warnings: number; information: number; marked_unused_pins: number; unknown_pin_names: number; unknown_pin_types: number };
   findings: Finding[];

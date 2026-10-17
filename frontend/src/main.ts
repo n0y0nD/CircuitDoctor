@@ -404,7 +404,7 @@ async function explainSelection(mode: "explain" | "power-trace" = "explain") {
 }
 
 function sourceLinks(sources: { title: string; url: string }[]) {
-  return sources.filter(source => ["https://docs.arduino.cc/", "https://www.buydisplay.com/", "https://www.vishay.com/", "https://github.com/KiCad/kicad-symbols/"].some(prefix => source.url.startsWith(prefix))).map(source => `<a class="spec-source" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)} ↗</a>`).join("");
+  return sources.filter(source => ["https://www.nxp.com/docs/", "https://docs.arduino.cc/", "https://www.buydisplay.com/", "https://www.vishay.com/", "https://github.com/KiCad/kicad-symbols/"].some(prefix => source.url.startsWith(prefix))).map(source => `<a class="spec-source" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)} ↗</a>`).join("");
 }
 function renderReview() {
   const button = $<HTMLButtonElement>("#run-review");
@@ -419,7 +419,8 @@ function renderReview() {
   const information = result.findings.filter(f => f.severity === "info");
   const unconnected = information.filter(f => f.rule === "single_pin_net" || f.rule === "unassigned_pin");
   const groups = information.filter(f => f.rule === "isolated_group");
-  const other = information.filter(f => !unconnected.includes(f) && !groups.includes(f));
+  const pullups = information.filter(f => f.rule === "i2c_pullup_check");
+  const other = information.filter(f => !unconnected.includes(f) && !groups.includes(f) && !pullups.includes(f));
   const required = result.requirements;
   const uncertainRequirements = (required?.unverified_pins.length || 0) + (required?.skipped_pins.length || 0) + (result.voltage?.unverified_parts || 0) + (result.i2c?.unverified_pins || 0);
   const heading = result.status === "incomplete" ? "Not enough information to check this circuit" : warnings.length ? `${warnings.length} wiring problem${warnings.length === 1 ? "" : "s"} to check` : groups.length ? `${groups.length} separate group${groups.length === 1 ? "" : "s"} to check` : uncertainRequirements ? "Some connections need a closer look" : required?.checked_pins ? "No issues found in the supported wiring checks" : result.electrical.checked_nets ? "No Arduino power-wire conflicts found" : "No supported power connections to check";
@@ -433,6 +434,7 @@ function renderReview() {
     ${warnings.length ? `<div class="finding-list">${warnings.map(f => `<button class="finding-card warning" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(connectionFor(f))}</p>${(f.rule.startsWith("required_") || f.rule === "supply_voltage_mismatch" || f.rule.startsWith("i2c_")) ? `<p>${esc(f.message)}</p>` : ""}<p><b>What to do:</b> ${esc(f.suggestion)}</p><small>Show this connection →</small></button>`).join("")}</div>` : ""}
     ${result.voltage?.checks.length ? `<div class="review-note"><strong>Supply voltage</strong>${result.voltage.checks.map(part => `<p>${esc(part.ref)}${part.pin ? ` · Pin ${esc(part.pin)}` : ""}: ${part.status === "unverified" ? `Not verified. ${esc(part.reason)}` : `${esc(part.nominal_voltage)}V nominal — ${part.status === "within_range" ? "within" : "outside"} the ${esc(part.operating_range?.min)}–${esc(part.operating_range?.max)}V operating range.`}</p>`).join("")}</div>` : ""}
     ${result.i2c?.checks.some(pin => pin.status === "connected" || pin.status === "unverified") ? `<div class="review-note"><strong>I2C signal wires</strong>${result.i2c.checks.filter(pin => pin.status === "connected" || pin.status === "unverified").map(pin => `<p>${esc(pin.message)}</p>`).join("")}</div>` : ""}
+    ${pullups.length ? `<details class="review-details"><summary>Pull-up resistors · ${result.pullups?.checks.filter(p => p.status === "external_path_found").length || 0} of ${pullups.length} signal pins have an external path</summary><p>These resistors connect signal wires to a supply. Some modules include them onboard.</p><div class="finding-list">${pullups.map(f => `<button class="finding-card info" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(f.message)}</p><small>Show wiring →</small></button>`).join("")}</div></details>` : ""}
     ${groups.length ? `<div class="finding-list">${groups.map(f => `<button class="finding-card info" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(f.message)}</p><small>Show these parts →</small></button>`).join("")}</div>` : ""}
     ${unconnected.length ? `<details class="review-details"><summary>${unconnected.length} pins with no connection</summary><p>These may be intentional. Select a pin to check whether your design needs it.</p><div class="unconnected-list">${unconnected.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(connectionFor(f))}<span>Show pin →</span></button>`).join("")}</div></details>` : ""}
     <details class="review-details"><summary>Check details</summary>
@@ -445,6 +447,7 @@ function renderReview() {
       ${required ? [...required.unverified_pins, ...required.skipped_pins].map(pin => `<p><strong>${esc(pin.ref)} · Pin ${esc(pin.pin)}:</strong> ${esc(pin.reason)}</p>`).join("") : ""}
       ${result.voltage?.checks.map(part => `<p><strong>${esc(part.ref)} supply specification</strong></p>${sourceLinks(part.sources)}`).join("") || ""}
       ${result.i2c?.checks.length ? `<p>${esc(result.i2c.scope)}</p>${sourceLinks([...new Map(result.i2c.checks.flatMap(pin => pin.sources).map(source => [source.url, source])).values()])}` : ""}
+      ${result.pullups?.checks.length ? `<p>${esc(result.pullups.scope)}</p>` : ""}
       ${result.voltage?.unknown_components.length ? `<p>Supply voltage not verified for unknown parts: ${esc(result.voltage.unknown_components.join(", "))}.</p>` : ""}
       ${result.electrical.unknown_components.length ? `<p>No current-limit checks for: ${esc(result.electrical.unknown_components.join(", "))}.</p>` : ""}
       ${result.cannot_verify.map(item => `<p><strong>${esc(item.check)}:</strong> ${esc(item.reason)}</p>`).join("")}

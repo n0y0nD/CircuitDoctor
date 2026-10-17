@@ -7,7 +7,11 @@ I2C review checks the exact ER-OLEDM0.91-1 I2C symbol's SDA/SCL pins against
 Uno R3 and classic Nano hardware I2C pins through FalkorDB wire routes. It highlights
 missing wires, crossed hardware signals and joined SDA/SCL lines. Unknown parts,
 conflicting metadata and paths through intermediate parts remain unverified.
-Software I2C, pull-ups, logic levels and successful communication are not assessed.
+External pull-up inspection traces signal → one two-pin `Device:R`/`R_Small` →
+known board rail in FalkorDB and shows the supporting wires. A positive imported
+resistor value establishes a candidate path, not suitable sizing or voltage.
+No external route does **not** mean missing pull-ups: onboard/internal resistors
+are not modeled. Software I2C, logic levels and successful communication are not assessed.
 
 ## Run with Docker
 

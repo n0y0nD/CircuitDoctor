@@ -2,6 +2,7 @@
 
 from .isolation import isolated_groups
 from .i2c import i2c_review
+from .pullups import pullup_review
 from .parts import electrical_review
 from .requirements import required_connections
 from .voltage import voltage_review
@@ -14,6 +15,7 @@ def check_rules(store, circuit_id):
     required = required_connections(store, circuit_id, facts)
     voltage = voltage_review(store, circuit_id, facts)
     i2c = i2c_review(store, circuit_id, facts)
+    pullups = pullup_review(store, circuit_id, facts, i2c['coverage'])
     required_missing = {(f['pin']['ref'], f['pin']['pin']) for f in required['findings'] + i2c['findings']}
     findings = []
     unused = sum(_marked_unused(pin) for pin in facts["pins"])
@@ -55,6 +57,15 @@ def check_rules(store, circuit_id):
         add(item['rule'], item['severity'], item['title'], item['message'], item['suggestion'], pin=item['pin'])
         findings[-1].update(evidence=item['evidence'], sources=item['sources'])
 
+    for item in pullups['coverage']['checks']:
+        if not item.get('evidence'):
+            continue
+        pin = next(p for p in facts['pins'] if p['ref'] == item['ref'] and p['pin'] == item['pin'])
+        title = f"{item['ref']} {item['signal']}: " + ('external pull-up path found' if item['status'] == 'external_path_found' else 'pull-up not verified')
+        add('i2c_pullup_check', 'info', title, item['message'],
+            'Check onboard pull-ups and the bus voltage before changing resistors. The file does not establish suitable resistance values or signal voltage limits.', pin=pin)
+        findings[-1].update(evidence=item['evidence'], sources=item['sources'])
+
     for item in voltage['findings']:
         add(item['rule'], item['severity'], item['title'], item['message'], item['suggestion'], pin=item['pin'])
         findings[-1].update(evidence=item['evidence'], sources=item['sources'], specifications=item['specifications'])
@@ -68,7 +79,7 @@ def check_rules(store, circuit_id):
     unknown_types = sum(not _known(pin["library_type"]) and not _known(pin["pintype"]) for pin in facts["pins"])
     cannot_verify = [
         {"check": "Full voltage compatibility", "reason": "Only catalog-listed operating ranges and direct nominal board supply connections are compared. Unknown part variants, external supplies, paths through components, GPIO limits, VIN and actual voltages are not verified."},
-        {"check": "Other required connections", "reason": "Only catalog-listed logic power/GND pins are checked. I2C signal correspondence is checked only for exact catalog parts and identified board pins. Other parts, software I2C, backlights and pull-ups are not verified."},
+        {"check": "Other required connections", "reason": "Only catalog-listed logic power/GND pins are checked. I2C signal correspondence is checked only for exact catalog parts and identified board pins. External pull-up resistor routes are inspected; onboard pull-ups, resistor sizing, other parts, software I2C and backlights are not verified."},
         {"check": "Circuit operation", "reason": "Firmware, current, physical wiring and component health are not checked."},
     ]
     if electrical["coverage"]["conflicting_pin_metadata"]:
@@ -76,11 +87,11 @@ def check_rules(store, circuit_id):
     if empty:
         cannot_verify.insert(0, {"check": "Complete connectivity review", "reason": "This export has no components or no nets to review."})
     return {"tool": "check_rules", "source": "falkordb", "circuit_id": circuit_id,
-            "scope": "connectivity_and_board_rails", "electrical": electrical["coverage"], "requirements": required["coverage"], "isolation": isolation["coverage"], "voltage": voltage["coverage"], "i2c": i2c["coverage"], "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
+            "scope": "connectivity_and_board_rails", "electrical": electrical["coverage"], "requirements": required["coverage"], "isolation": isolation["coverage"], "voltage": voltage["coverage"], "i2c": i2c["coverage"], "pullups": pullups["coverage"], "status": "incomplete" if empty else "warnings" if warning_count else "no_warnings",
             "summary": {"components": facts["component_count"], "nets": len(facts["nets"]),
                         "pins": len(facts["pins"]), "warnings": warning_count,
                         "information": len(findings) - warning_count, "marked_unused_pins": unused,
                         "unknown_pin_names": unknown_names, "unknown_pin_types": unknown_types},
-            "findings": findings, "cannot_verify": cannot_verify, "queries": facts["queries"] + isolation["queries"] + required["queries"] + voltage["queries"] + i2c["queries"],
+            "findings": findings, "cannot_verify": cannot_verify, "queries": facts["queries"] + isolation["queries"] + required["queries"] + voltage["queries"] + i2c["queries"] + pullups["queries"],
             "limitations": ["Connectivity, limited board rails, catalog-listed supply pins, verified nominal supply ranges and hardware I2C pin correspondence only. No warnings does not mean the circuit is electrically correct.",
                             "Unused markers are read from pin metadata, not inferred from net names."]}
