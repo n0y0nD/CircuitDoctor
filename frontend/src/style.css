@@ -21,7 +21,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; padding: 16px 4%; border-bottom: 1px solid var(--line); background: white; }
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #233c34; font-size: 20px; font-weight: 650; letter-spacing: -.7px; }
 .brand img { width: 34px; height: 34px; }
-.header-actions, .file-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.header-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .connection-status { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
 .connection-status i { width: 6px; height: 6px; border-radius: 50%; background: #3e9e7c; }
 .connection-status.offline i { background: #c47d24; }
@@ -128,13 +128,6 @@ tr:hover { background: #f6faf7; }
 .net-note { display: block; color: #83958a; font-size: 10px; margin-top: 5px; }
 .pin-cell { font: 11px monospace; }
 .muted-cell { color: #7b8e81; font-size: 11px; }
-.file-details { font-size: 12px; color: var(--muted); margin-top: 24px; border-top: 1px solid var(--line); padding: 15px 0; }
-.file-details summary { cursor: pointer; width: fit-content; }
-#storage-info { overflow-wrap: anywhere; }
-.file-actions { gap: 8px; margin: 14px 0; }
-.file-actions .button { min-height: 34px; padding: 8px 12px; font-size: 11px; }
-.json-view { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.7 monospace; margin: 0; padding: 20px; color: #536f5e; }
-#storage-query { padding: 12px; background: #eff4f0; border-radius: 6px; }
 dialog { border: 1px solid var(--line); border-radius: 12px; padding: 30px; width: min(480px, calc(100% - 32px)); color: #345340; }
 dialog::backdrop { background: #19312660; }
 dialog h2 { font-size: 21px; font-weight: 550; padding-right: 20px; }
@@ -142,7 +135,6 @@ dialog ol { padding-left: 22px; font-size: 13px; line-height: 1.8; }
 dialog li { margin: 12px 0; }
 dialog p { font-size: 12px; line-height: 1.7; color: var(--muted); }
 .dialog-close { position: absolute; right: 10px; top: 10px; }
-.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 12px 18px; border-radius: 8px; background: #28513b; color: white; font-size: 12px; z-index: 200; }
 @media (max-width: 1000px) {
   .workbench { grid-template-columns: minmax(0, 1fr); }
   .canvas-wrap { height: 460px; }
@@ -259,7 +251,6 @@ dialog p { font-size: 12px; line-height: 1.7; color: var(--muted); }
 .chat-evidence-item { padding: 10px 0; border-top: 1px solid #dce5e1; }
 .chat-evidence-item > strong { display: block; }
 .chat-evidence-item button { margin: 8px 12px 8px 0; }
-.chat-evidence pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; font-size: 12px; }
 .chat-form { margin-top: 20px; }
 .chat-form label { display: block; font-size: 13px; margin-bottom: 8px; font-weight: 600; }
 .chat-input-row { display: flex; gap: 12px; align-items: end; }

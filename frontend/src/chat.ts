@@ -7,7 +7,7 @@ export interface ChatEvidence {
   arguments: Record<string, string>;
   result: {
     source: 'falkordb'; circuit_id: string; evidence?: Explanation['evidence'];
-    findings?: { title: string; evidence: Explanation['evidence'] }[];
+    findings?: { title: string; rule?: string; evidence: Explanation['evidence'] }[];
     queries?: { cypher: string; parameters: Record<string, unknown> }[];
     [key: string]: unknown;
   };

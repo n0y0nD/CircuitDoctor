@@ -40,7 +40,7 @@ export interface Circuit {
   nets: Net[];
 }
 export type Selection = { kind: "component" | "net"; id: string } | { kind: "pin"; id: string; ref: string; pin: string };
-export type View = "graph" | "components" | "nets" | "data";
+export type View = "graph" | "components" | "nets";
 
 export const escapeHtml = (value: unknown) =>
   String(value).replace(
