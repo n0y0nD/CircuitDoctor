@@ -11,6 +11,7 @@ import { ChatPanel } from "./chat-panel";
 import type { Explanation } from "./explanation";
 import { renderConnectionExplanation } from "./connection-explanation";
 import { icon, sym } from "./icons";
+import { dropHtml, helpDialogHtml, landingHtml, loadingHtml, loadingSteps, type DropState, type LoadStep } from "./landing";
 import { CircuitGraph } from "./graph";
 import { ExplanationRequest, singleEvidencePin, type ExplanationState } from "./explanation";
 import { ReviewRequest, type ReviewState, type Finding } from "./review";
@@ -69,25 +70,13 @@ $("#app").innerHTML = `
   <a class="brand sm" href="/" aria-label="CircuitDoctor home">${sym("cd-logo")}CircuitDoctor</a>
   <span class="vr" id="file-divider" hidden></span>
   <div class="file" id="topbar-file" hidden>${sym("i-netfile")}<b id="topbar-filename"></b><span id="topbar-board"></span></div>
-  <div class="header-actions"><span class="stat" id="connection-status" role="status"><i class="live wait"></i>Connecting…</span><button class="btn upload-trigger" id="replace-file" hidden>${sym("i-upload")}Upload another</button><button class="btn quiet help-trigger" aria-label="How to export a netlist" title="How to export a netlist">${icon("help", 16)}Help</button></div>
+  <div class="header-actions"><span class="stat" id="connection-status" role="status"><i class="live wait"></i>Connecting…</span><button class="btn quiet" id="cancel-load" type="button" hidden>Cancel</button><button class="btn upload-trigger" id="replace-file" hidden>${sym("i-upload")}Upload another</button><button class="btn quiet help-trigger" aria-label="How to export a netlist" title="How to export a netlist">${icon("help", 16)}Help</button></div>
 </header>
 <main>
   <input id="file-input" type="file" accept=".net" hidden />
   <div id="notice" role="alert" hidden></div>
-  <section class="welcome" id="welcome" aria-labelledby="welcome-title">
-    <p class="supported-boards">ARDUINO UNO R3 <span>·</span> CLASSIC NANO</p>
-    <h1 id="welcome-title">Understand your circuit.</h1>
-    <p class="welcome-description">Bring your KiCad netlist. See what’s connected,<br class="desktop-break"/> and follow every pin.</p>
-    <div class="upload-zone" id="dropzone">
-      <span class="upload-symbol">${icon("upload", 28)}</span>
-      <button class="button primary upload-trigger">Upload .net file ${icon("arrow", 17)}</button>
-      <p class="drop-hint">or drag your file here</p>
-      <span class="file-note">KiCad netlist · Up to 10 MiB</span>
-    </div>
-    <button class="text-button help-trigger">Where do I get a .net file? ${icon("chevron", 14)}</button>
-    <p class="scope-note">Explore connections and check Arduino power-rail wiring. Ask Gemini about your connections. Full electrical diagnosis is not available.</p>
-  </section>
-  <div id="loading-overlay" class="loading-overlay" role="status" hidden><span class="spinner"></span> Reading your circuit…</div>
+  ${landingHtml()}
+  ${loadingHtml()}
   <section class="circuit-section" id="circuit-section" aria-label="Your uploaded circuit" hidden>
     <div class="circuit-topline"><div class="circuit-title-group"><span class="file-icon">${icon("file", 23)}</span><div><h1 id="circuit-title"></h1><p id="circuit-summary"></p></div></div><button class="icon-button" id="clear-circuit" aria-label="Close circuit and return to upload" title="Close circuit">${icon("close", 19)}</button></div>
     <section class="review-panel" aria-label="Circuit review">
@@ -115,7 +104,7 @@ $("#app").innerHTML = `
 </main>
 <footer class="statusbar"><div id="meter"></div><div class="st"><span id="db-status"><i class="live wait"></i>FalkorDB…</span><span class="d">·</span><span>Connections from your file. No circuit simulation.</span></div></footer>
 <div class="drop-overlay" id="drop-overlay" hidden>${icon("upload", 32)}<strong>Drop your .net file</strong></div>
-<dialog id="help-dialog" aria-labelledby="help-title"><button class="icon-button dialog-close" id="close-help" aria-label="Close help">${icon("close")}</button><h2 id="help-title">Export your circuit from KiCad</h2><ol><li>Open your circuit in the schematic editor.</li><li>Select <strong>File → Export → Netlist</strong>.</li><li>Choose the <strong>KiCad</strong> format and save the <strong>.net</strong> file.</li><li>Upload that file here to explore its connections.</li></ol><p>Images, PCB files and schematics cannot be uploaded directly.</p><button class="button primary" id="got-it">Got it</button></dialog>`;
+${helpDialogHtml()}`;
 
 function showEvidence(evidence: Explanation["evidence"] | null, reveal = false) {
   clearExplanation();
@@ -142,7 +131,7 @@ const chatPanel = new ChatPanel($("#chat-panel"), evidence => {
   $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
 });
 const verifyPanel = new VerifyPanel($("#verify-panel"), async (id, evidence) => {
-  if (circuit?.storage.circuit_id !== id) await readCircuit(`/api/circuits/${encodeURIComponent(id)}`, "Saved circuit", {}, true);
+  if (circuit?.storage.circuit_id !== id) await readCircuit(`/api/circuits/${encodeURIComponent(id)}`, "saved circuit", {}, true, false);
   if (circuit?.storage.circuit_id === id) showEvidence(evidence, true);
 }, $("#open-verify"), result => {
   activeComparison = result ? { original_id: result.original_id, corrected_id: result.corrected_id } : null;
@@ -156,8 +145,47 @@ function connectionState(online: boolean) {
   element.classList.toggle("offline", !online);
   element.innerHTML = `<i class="live"></i>Graph DB ${online ? "connected" : "offline"}`;
   $("#db-status").classList.toggle("offline", !online);
+  $("#landing-status").classList.toggle("offline", !online);
+  $("#landing-status").innerHTML = element.innerHTML;
+  serviceOnline = online;
+  if (!online) { setDrop({ kind: "offline", server: !apiReachable }); scheduleStatusCheck(); }
+  else if (dropState.kind === "offline") setDrop({ kind: "ready" });
   $("#db-status").innerHTML = `<i class="live"></i>FalkorDB ${online ? "connected" : "offline"}`;
 }
+let serviceOnline = true;
+let apiReachable = true;
+let dropState: DropState = { kind: "ready" };
+function setDrop(state: DropState) {
+  dropState = state;
+  const zone = $("#dropzone");
+  zone.className = `drop dropzone${state.kind === "error" ? " err" : state.kind === "offline" ? " off" : ""}`;
+  zone.innerHTML = dropHtml(state);
+  document.querySelectorAll<HTMLButtonElement>(".sample-trigger").forEach(b => { b.disabled = state.kind === "offline"; });
+}
+let statusTimer = 0;
+// While the service is down, look again every few seconds so the page recovers on its own.
+function scheduleStatusCheck() {
+  clearTimeout(statusTimer);
+  statusTimer = window.setTimeout(checkStatus, 5000);
+}
+function checkStatus() {
+  fetch("/api/status")
+    .then(async (response) => { apiReachable = true; connectionState(response.ok && (await response.json()).graph_storage === "connected"); })
+    .catch(() => { apiReachable = false; connectionState(false); });
+}
+type Screen = "landing" | "loading" | "workspace";
+function setScreen(screen: Screen) {
+  document.body.dataset.screen = screen;
+  $("#welcome").hidden = screen !== "landing";
+  $("#loading-view").hidden = screen !== "loading";
+  $("#circuit-section").hidden = screen !== "workspace";
+  $("#cancel-load").hidden = screen !== "loading";
+  $("#replace-file").hidden = screen !== "workspace";
+  $("#topbar-file").hidden = screen === "landing";
+  $("#file-divider").hidden = screen === "landing";
+  document.querySelector<HTMLElement>(".topbar #topbar-board")!.hidden = screen === "loading";
+}
+function setLoadStep(step: LoadStep) { $("#loading-steps").innerHTML = loadingSteps(step); }
 // The status-bar meter: words only (SHORT, PASS, TRACE…), never a measured value.
 let meterOverride: Reading | null = null;
 function renderMeter() {
@@ -168,17 +196,18 @@ function notice(message = "") {
   $("#notice").hidden = !message;
 }
 function setBusy(value: boolean) {
-  $("#loading-overlay").hidden = !value;
-  $("#dropzone").classList.toggle("loading", value);
   document.querySelectorAll<HTMLButtonElement>(".upload-trigger").forEach((b) => {
     b.disabled = value;
   });
 }
+let loadController: AbortController | null = null;
+class LoadError extends Error { constructor(message: string, readonly status = 0) { super(message); } }
 async function readCircuit(
   url: string,
   name: string,
   options: RequestInit = {},
   keepComparison = false,
+  showLoading = true,
 ) {
   clearExplanation();
   clearReview();
@@ -187,13 +216,24 @@ async function readCircuit(
   pathPanel.setCircuit(null);
   if (!keepComparison) verifyPanel.setCircuit(null);
   const currentRequest = ++requestId;
+  loadController?.abort();
+  const controller = loadController = new AbortController();
+  const previous = circuit;
   setBusy(true);
   notice();
+  if (dropState.kind === "error") setDrop({ kind: "ready" });
+  if (showLoading) {
+    $("#loading-file").textContent = name;
+    $("#topbar-filename").textContent = name;
+    setLoadStep("reading");
+    setScreen("loading");
+  }
   try {
-    let response = await fetch(url, options);
+    let response = await fetch(url, { ...options, signal: controller.signal });
     if (response.ok && options.method === "POST") {
       const receipt = (await response.json()) as { circuit_id: string };
-      response = await fetch(`/api/circuits/${encodeURIComponent(receipt.circuit_id)}`);
+      if (currentRequest === requestId) setLoadStep("checking");
+      response = await fetch(`/api/circuits/${encodeURIComponent(receipt.circuit_id)}`, { signal: controller.signal });
     }
     if (!response.ok) {
       if (response.status >= 500 && currentRequest === requestId)
@@ -203,10 +243,11 @@ async function readCircuit(
         .catch(() => ({
           detail: "Unable to connect to CircuitDoctor. Please try again shortly.",
         }));
-      throw new Error(
+      throw new LoadError(
         typeof error.detail === "string"
           ? error.detail
           : "Could not read this netlist.",
+        response.status,
       );
     }
     const result = (await response.json()) as Circuit;
@@ -230,31 +271,57 @@ async function readCircuit(
     $<HTMLInputElement>("#search").value = "";
     selection = null;
     connectionState(true);
+    setLoadStep("checking");
+    // Every load runs the wiring review, so the workspace opens on the answer.
+    await runReview();
+    if (currentRequest !== requestId) return;
     renderCircuit();
   } catch (error) {
     if (currentRequest !== requestId) return;
+    circuit = previous;
     const message =
       error instanceof Error ? error.message : "Unable to load this netlist.";
-    notice(
-      `${message}${circuit ? " Your previous circuit is still displayed." : ""}`,
-    );
-    if (circuit && !keepComparison) verifyPanel.setCircuit(circuit);
-    if (circuit) { chatPanel.setCircuit(circuit.storage.circuit_id); chatPanel.setComparison(activeComparison); pathPanel.setCircuit(circuit); }
-    if (error instanceof TypeError) connectionState(false);
+    const offline = error instanceof TypeError || (error instanceof LoadError && error.status >= 500);
+    if (error instanceof TypeError) { apiReachable = false; connectionState(false); }
+    if (circuit) {
+      setScreen("workspace");
+      notice(`${message} Your previous circuit is still displayed.`);
+      if (!keepComparison) verifyPanel.setCircuit(circuit);
+      chatPanel.setCircuit(circuit.storage.circuit_id); chatPanel.setComparison(activeComparison); pathPanel.setCircuit(circuit);
+      renderCircuit();
+    } else {
+      setScreen("landing");
+      if (offline) setDrop({ kind: "offline", server: error instanceof TypeError });
+      else if (error instanceof LoadError && error.status === 413) setDrop({ kind: "error", title: "This file is too large.", detail: message, kicadPath: false });
+      else if (error instanceof LoadError && error.status === 400) setDrop({ kind: "error", title: "That’s not a KiCad netlist.", detail: message, kicadPath: true });
+      else setDrop({ kind: "error", title: "Couldn’t open this circuit.", detail: message, kicadPath: false });
+    }
   } finally {
     if (currentRequest === requestId) setBusy(false);
   }
 }
+function cancelLoad() {
+  if (document.body.dataset.screen !== "loading") return;
+  requestId++;
+  loadController?.abort();
+  reviewRequest.cancel();
+  setBusy(false);
+  // If the circuit already arrived, open it; the review can be run again from the workspace.
+  if (circuit) { if (review.status === "loading") review = { status: "idle" }; renderCircuit(); }
+  else setScreen("landing");
+}
+function wrongFile(title: string, detail: string, kicadPath: boolean) {
+  if (circuit) notice(`${title} ${detail}`.trim());
+  else setDrop({ kind: "error", title, detail, kicadPath });
+}
 async function upload(file: File | undefined) {
   if (!file) return;
   if (!file.name.toLowerCase().endsWith(".net")) {
-    notice(
-      "Choose a KiCad .net file. Schematics, images and PCB files cannot be read here.",
-    );
+    wrongFile("That’s not a KiCad netlist.", circuit ? "Choose a KiCad .net file (File ▸ Export ▸ Netlist)." : "", true);
     return;
   }
   if (file.size > 10 * 1024 * 1024) {
-    notice("This file is larger than 10 MiB. Choose a smaller netlist.");
+    wrongFile("This file is too large.", "Choose a KiCad netlist up to 10 MiB.", false);
     return;
   }
   await readCircuit(`/api/circuits?filename=${encodeURIComponent(file.name)}`, file.name, {
@@ -265,9 +332,7 @@ async function upload(file: File | undefined) {
 }
 function renderCircuit() {
   if (!circuit) return;
-  $("#welcome").hidden = true;
-  $("#circuit-section").hidden = false;
-  $("#replace-file").hidden = false;
+  setScreen("workspace");
   const boards = circuit.components.filter((c) => componentKind(c) === "board");
   const board = boards.length === 1
     ? boardLabel(boards[0])
@@ -500,6 +565,11 @@ document.addEventListener("click", (event) => {
   const finding = target.closest<HTMLElement>("[data-finding]");
   if (finding) inspectFinding(finding.dataset.finding!);
   if (target.closest(".upload-trigger:not(:disabled)")) $("#file-input").click();
+  if (target.closest(".sample-trigger:not(:disabled)")) {
+    $<HTMLDialogElement>("#help-dialog").close();
+    void readCircuit("/api/samples/uno_short", "uno_short.net", { method: "POST" });
+  }
+  if (target.closest("#cancel-load")) cancelLoad();
   if (target.closest(".help-trigger"))
     $<HTMLDialogElement>("#help-dialog").showModal();
   if (target.closest("#close-help, #got-it"))
@@ -578,7 +648,13 @@ function setExpanded(expanded: boolean) {
 }
 $("#expand-canvas").onclick = () => setExpanded(!$(".explorer-panel").classList.contains("expanded"));
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape") setExpanded(false);
+  if (event.key === "Escape") { setExpanded(false); cancelLoad(); }
+  // The shortcut shown on the "Choose .net file" button.
+  if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "o"
+      && document.body.dataset.screen !== "loading" && serviceOnline && !document.querySelector("dialog[open]")) {
+    event.preventDefault();
+    $("#file-input").click();
+  }
 });
 $("#clear-circuit").onclick = () => {
   verifyPanel.setCircuit(null);
@@ -593,27 +669,22 @@ $("#clear-circuit").onclick = () => {
   circuit = null;
   selection = null;
   history.replaceState(null, "", location.pathname + location.search);
-  $("#welcome").hidden = false;
-  $("#circuit-section").hidden = true;
-  $("#replace-file").hidden = true;
-  $("#topbar-file").hidden = true;
-  $("#file-divider").hidden = true;
+  setScreen("landing");
   renderMeter();
   notice();
   setBusy(false);
-  $(".welcome .upload-trigger").focus();
+  document.querySelector<HTMLButtonElement>("#dropzone .upload-trigger")?.focus();
 };
 $<HTMLDialogElement>("#help-dialog").addEventListener("click", (event) => {
   if (event.target === $<HTMLDialogElement>("#help-dialog"))
     $<HTMLDialogElement>("#help-dialog").close();
 });
-fetch("/api/status")
-  .then(async (response) => connectionState(response.ok && (await response.json()).graph_storage === "connected"))
-  .catch(() => connectionState(false));
+setScreen("landing");
+checkStatus();
 const savedComparison = comparisonFromHash(location.hash);
 const savedId = new URLSearchParams(location.hash.slice(1)).get("circuit");
 if (savedId && /^[0-9a-f]{32}$/.test(savedId)) {
-  const loading = readCircuit(`/api/circuits/${savedId}`, "Stored circuit");
+  const loading = readCircuit(`/api/circuits/${savedId}`, "your saved circuit");
   const loadingVersion = requestId;
   void loading.then(async () => {
     if (!savedComparison || requestId !== loadingVersion || circuit?.storage.circuit_id !== savedId) return;

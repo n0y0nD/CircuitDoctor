@@ -25,6 +25,19 @@ class WorkspaceApiTests(unittest.TestCase):
                 self.assertIn(self.client.post(f"/api/circuits/samples/{name}").status_code, (404, 405))
             store.assert_not_called()
 
+    def test_sample_circuit_is_saved_through_storage_like_an_upload(self):
+        bundled = ROOT / "circuitdoctor/samples/uno_short.net"
+        self.assertEqual(bundled.read_bytes(), (ROOT / "tests/fixtures/kicad/uno_short.net").read_bytes())
+        with patch("circuitdoctor.api.get_store") as store:
+            store.return_value.save.return_value = {"circuit_id": "a" * 32, "filename": "uno_short.net"}
+            response = self.client.post("/api/samples/uno_short")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json(), {"circuit_id": "a" * 32, "filename": "uno_short.net"})
+        store.return_value.save.assert_called_once_with(load_netlist(bundled), filename="uno_short.net")
+        with patch("circuitdoctor.api.get_store") as store:
+            self.assertIn(self.client.post("/api/samples/clean").status_code, (404, 405))
+            store.assert_not_called()
+
     def test_raw_upload_preserves_connectivity_and_accepts_utf8_bom(self):
         path = ROOT / "tests/fixtures/kicad/nano_normal.net"
         response = self.client.post("/api/parse", content=b"\xef\xbb\xbf" + path.read_bytes(),
