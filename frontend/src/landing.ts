@@ -56,6 +56,7 @@ export function landingHtml() {
     <p class="kicker">Continuity test <b>·)))</b> for KiCad netlists</p>
     <h1 class="display" id="welcome-title">Hear the short<br>before you <em>smell</em> it.</h1>
     <p class="sub">CircuitDoctor probes every pin and net in your KiCad netlist, and highlights possible wiring problems before you connect your board.</p>
+    <a class="graph-badge" href="#graph">Circuit analysis powered by <strong>FalkorDB</strong> <span aria-hidden="true">↗</span></a>
     <div class="bench-wrap">${bench()}</div>
     <section class="drop dropzone" id="dropzone" aria-live="polite">
       ${netDoc}
@@ -73,7 +74,7 @@ export function landingHtml() {
       <div class="feat"><span class="dial" style="font-size:10px">↔</span><div><b>Trace a connection</b><small>Pin to pin, every hop shown</small></div></div>
       <div class="feat"><span class="dial">?</span><div><b>Ask AI with evidence</b><small>Answers explain your connections</small></div></div>
     </div>
-    <div class="pow">Connections from your file. No circuit simulation.</div>
+    <div class="pow">Powered by <strong>FalkorDB</strong><br>Connections from your file. No circuit simulation.</div>
   </footer>
   </div>
   ${belowFoldHtml()}
@@ -134,11 +135,11 @@ function belowFoldHtml() {
 </section>
 <section class="sec" id="graph" aria-labelledby="graph-title">
   <div class="why">
-    <div>${kicker('03', 'Follow the connections')}<h2 class="display" id="graph-title">A circuit is<br>already a graph.</h2>
-      <p class="body">Parts have pins, and pins sit on wires (nets). CircuitDoctor follows those connections to help you understand which pins share a wire.</p>
-      <p class="body">Trace the route between two pins over wires and through two-pin resistors. Each step shows which connection to inspect.</p></div>
+    <div>${kicker('03', 'Why FalkorDB')}<h2 class="display" id="graph-title">Your circuit,<br>connected in FalkorDB.</h2>
+      <p class="body">FalkorDB stores your uploaded circuit as connected components, pins and wires (nets). CircuitDoctor checks those relationships and highlights the connections behind each finding.</p>
+      <p class="body">FalkorDB finds routes between pins over wires and supported two-pin resistors, and identifies separate groups of parts. Gemini uses the returned circuit evidence to explain what to check.</p></div>
     <div class="gpanel">
-      <div class="ph"><h2>How parts connect</h2></div>
+      <div class="ph"><h2>How your circuit connects in FalkorDB</h2></div>
       <div class="gd"><svg viewBox="0 0 880 236" role="img" aria-label="A component has pins; each pin is on a net" font-family="JetBrains Mono, monospace">
         <rect x="56" y="70" width="176" height="96" rx="10" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="2"/>
         <text x="72" y="58" font-size="10.5" letter-spacing="1.2" fill="#8A867E">COMPONENT</text>
@@ -183,7 +184,7 @@ function belowFoldHtml() {
 <footer class="pfoot">
   <div class="brand sm">${sym('cd-logo')}CircuitDoctor</div>
   <nav aria-label="Footer"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a></nav>
-  <div class="pow">Connections from your file. No circuit simulation.</div>
+  <div class="pow">Powered by <strong>FalkorDB</strong><br>Connections from your file. No circuit simulation.</div>
 </footer>`;
 }
 
