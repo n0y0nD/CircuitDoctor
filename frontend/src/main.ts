@@ -15,6 +15,8 @@ import { dropHtml, helpDialogHtml, landingHtml, loadingHtml, loadingSteps, type 
 import { CircuitGraph } from "./graph";
 import { ExplanationRequest, singleEvidencePin, type ExplanationState } from "./explanation";
 import { ReviewRequest, type ReviewState, type Finding } from "./review";
+import { reviewPanelHtml, sourceLinks } from "./review-panel";
+import { boardRecognized, groupFindings } from "./findings";
 import {
   componentKind,
   boardLabel,
@@ -70,36 +72,52 @@ $("#app").innerHTML = `
   <a class="brand sm" href="/" aria-label="CircuitDoctor home">${sym("cd-logo")}CircuitDoctor</a>
   <span class="vr" id="file-divider" hidden></span>
   <div class="file" id="topbar-file" hidden>${sym("i-netfile")}<b id="topbar-filename"></b><span id="topbar-board"></span></div>
-  <div class="header-actions"><span class="stat" id="connection-status" role="status"><i class="live wait"></i>Connecting…</span><button class="btn quiet" id="cancel-load" type="button" hidden>Cancel</button><button class="btn upload-trigger" id="replace-file" hidden>${sym("i-upload")}Upload another</button><button class="btn quiet help-trigger" aria-label="How to export a netlist" title="How to export a netlist">${icon("help", 16)}Help</button></div>
+  <ol class="fix-steps" id="fix-steps" aria-label="Fix it in three steps" hidden></ol>
+  <div class="header-actions"><span class="stat" id="connection-status" role="status"><i class="live wait"></i>Connecting…</span><button class="btn quiet" id="cancel-load" type="button" hidden>Cancel</button><button class="btn" id="back-to-problem" type="button" hidden>← Back to the problem</button><button class="btn pri" id="run-review" type="button" hidden>${sym("i-beep", "beep")}Check again</button><button class="btn upload-trigger" id="replace-file" type="button" hidden>${sym("i-upload")}Upload another</button>
+    <div class="menu" id="more-menu" hidden><button class="btn quiet" id="more-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="more-list">More <span class="caret" aria-hidden="true">▼</span></button>
+      <div class="menu-list" id="more-list" role="menu" hidden>
+        <button type="button" role="menuitem" data-open-trace>${sym("i-trace")}Trace a connection</button>
+        <button type="button" role="menuitem" id="open-verify" aria-controls="verify-panel" aria-expanded="false">${sym("i-check")}Check an updated file</button>
+        <button type="button" role="menuitem" class="upload-trigger">${sym("i-upload")}Upload another file</button>
+        <label class="toggle-label" role="menuitemcheckbox"><input type="checkbox" id="unused-toggle"/><span>Show unconnected pins</span></label>
+        <button type="button" role="menuitem" id="expand-canvas">${icon("fit", 15)}<span>Expand drawing</span></button>
+        <button type="button" role="menuitem" id="reset-layout">${icon("graph", 15)}Reset layout</button>
+        <button type="button" role="menuitem" class="help-trigger">${icon("help", 15)}Where do I get a .net file?</button>
+        <hr/>
+        <button type="button" role="menuitem" id="clear-circuit">${icon("close", 15)}Close circuit</button>
+      </div>
+    </div>
+  </div>
 </header>
 <main>
   <input id="file-input" type="file" accept=".net" hidden />
   <div id="notice" role="alert" hidden></div>
   ${landingHtml()}
   ${loadingHtml()}
-  <section class="circuit-section" id="circuit-section" aria-label="Your uploaded circuit" hidden>
-    <div class="circuit-topline"><div class="circuit-title-group"><span class="file-icon">${icon("file", 23)}</span><div><h1 id="circuit-title"></h1><p id="circuit-summary"></p></div></div><button class="icon-button" id="clear-circuit" aria-label="Close circuit and return to upload" title="Close circuit">${icon("close", 19)}</button></div>
-    <section class="review-panel" aria-label="Circuit review">
-      <div class="review-heading"><div><h2>Check your connections</h2><p>See what needs attention, then select it to see the wiring.</p></div><div class="review-actions"><button id="run-review" class="button primary">Run review</button><button id="open-verify" class="text-button" aria-controls="verify-panel" aria-expanded="false">Check an updated file</button></div></div>
-      <div id="review-results" aria-live="polite"></div>
-    </section>
-    <section id="verify-panel" class="path-panel" aria-label="Check an updated file" hidden></section>
-    <section id="path-panel" class="path-panel" aria-label="Connection route" hidden></section>
-    <div class="workbench">
-      <section class="explorer-panel" aria-label="Circuit explorer">
-        <div class="explorer-toolbar"><div class="view-tabs" role="tablist" aria-label="Circuit views">
-          <button data-view="graph" role="tab" aria-selected="true" class="active">Circuit</button>
-          <button data-view="components" role="tab" aria-selected="false">Components</button>
-          <button data-view="nets" role="tab" aria-selected="false">Connections</button>
-        </div><button class="icon-button" id="expand-canvas" aria-label="Expand workspace" title="Expand workspace">${icon("fit", 18)}</button></div>
-        <div class="explorer-subbar"><label class="search-field">${icon("search", 16)}<input id="search" placeholder="Find a component or net" aria-label="Find a component or net"/></label><label class="toggle-label"><input type="checkbox" id="unused-toggle"/><span>Show unconnected pins</span></label></div>
-        <div class="canvas-wrap"><div id="graph-view" class="graph-view" role="tabpanel" aria-label="Circuit graph. Use Components and Connections for keyboard-accessible details."></div><div id="list-view" class="list-view" role="tabpanel" hidden></div><div id="canvas-empty" class="canvas-empty" hidden><h2>No components in this file</h2><p>Upload a netlist with components and connections to explore.</p></div><div class="graph-controls" id="graph-controls"><button class="icon-button" id="zoom-out" aria-label="Zoom out">${icon("minus", 16)}</button><span id="zoom-value">100%</span><button class="icon-button" id="zoom-in" aria-label="Zoom in">${icon("plus", 16)}</button><button class="icon-button" id="fit-view" aria-label="Fit graph to screen">${icon("fit", 17)}</button><button class="reset-layout" id="reset-layout" title="Restore automatic placement">Reset layout</button></div><span class="canvas-hint" id="canvas-hint">Drag parts / ○ wire bends · Double-click part to zoom</span></div>
-        <div class="graph-footer"><div class="legend"><span><i class="legend-component"></i> Component</span><span><i class="legend-net"></i> Wire junction</span><span><i class="legend-single"></i> Unconnected pin</span></div><span id="graph-summary"></span></div>
-      </section>
-      <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="selected-finding" hidden></div><div id="inspector-body"></div><section id="explanation-panel" class="explanation-panel" aria-label="Connection explanation" hidden></section></aside>
+  <section class="workspace" id="circuit-section" aria-label="Your uploaded circuit" hidden>
+    <div class="col">
+      <section class="panel problems" id="review-panel" aria-label="Wiring check"><div id="review-results" aria-live="polite"></div></section>
+      <section id="path-panel" class="panel side-panel" aria-label="Trace a connection" hidden></section>
+      <section id="verify-panel" class="panel side-panel" aria-label="Check an updated file" hidden></section>
+      <section id="chat-panel" class="panel ask chat-panel" aria-label="Ask about your circuit" hidden></section>
     </div>
-    <p class="scope-note">Gold sockets are connected pins. Drag the open circles to route wires. Board drawings are illustrative; pin names come from your file.</p>
-    <section id="chat-panel" class="chat-panel" aria-label="Ask about your circuit" hidden></section>
+    <section class="panel canvas explorer-panel" aria-label="Circuit explorer">
+      <div class="chead">
+        <div class="view-tabs" role="tablist" aria-label="Circuit views">
+          <button data-view="graph" role="tab" aria-selected="true" class="tab active">Circuit</button>
+          <button data-view="components" role="tab" aria-selected="false" class="tab">Components</button>
+          <button data-view="nets" role="tab" aria-selected="false" class="tab">Connections</button>
+        </div>
+        <label class="find"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input id="search" placeholder="Find a part or pin" aria-label="Find a part or pin"/></label>
+        <span class="key" id="canvas-key"></span>
+      </div>
+      <div class="cbody">
+        <div class="canvas-wrap"><div id="graph-view" class="graph-view" role="tabpanel" aria-label="Circuit drawing. Use Components and Connections for keyboard-accessible details."></div><div id="list-view" class="list-view" role="tabpanel" hidden></div><div id="canvas-empty" class="canvas-empty" hidden><h2>No components in this file</h2><p>Upload a netlist with components and connections to explore.</p></div>
+          <div class="zoom" id="graph-controls"><button type="button" id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-value">100%</span><button type="button" id="zoom-in" aria-label="Zoom in">+</button><button type="button" id="fit-view" aria-label="Fit drawing to screen">Fit</button></div>
+          <span class="canvas-hint" id="canvas-hint">Drag parts to tidy the layout</span><span class="sr-only" id="graph-summary" role="status"></span></div>
+        <aside class="inspector" id="inspector" aria-label="Connection details" hidden><div class="ph"><h2>Connection details</h2><button class="x" type="button" id="close-inspector" aria-label="Close details">×</button></div><div class="inspector-scroll"><div id="selected-finding" hidden></div><div id="inspector-body"></div><section id="explanation-panel" class="explanation-panel" aria-label="Connection explanation" hidden></section></div></aside>
+      </div>
+    </section>
   </section>
 </main>
 <footer class="statusbar"><div id="meter"></div><div class="st"><span id="db-status"><i class="live wait"></i>FalkorDB…</span><span class="d">·</span><span>Connections from your file. No circuit simulation.</span></div></footer>
@@ -123,12 +141,12 @@ function showEvidence(evidence: Explanation["evidence"] | null, reveal = false) 
   $<HTMLInputElement>("#unused-toggle").checked = showUnused;
   renderView();
   renderInspector();
-  if (reveal) $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
+  if (reveal) $(".explorer-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 let activeComparison: ChatComparison | null = null;
 const chatPanel = new ChatPanel($("#chat-panel"), evidence => {
   showEvidence(evidence);
-  $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
+  $(".explorer-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
 });
 const verifyPanel = new VerifyPanel($("#verify-panel"), async (id, evidence) => {
   if (circuit?.storage.circuit_id !== id) await readCircuit(`/api/circuits/${encodeURIComponent(id)}`, "saved circuit", {}, true, false);
@@ -180,7 +198,10 @@ function setScreen(screen: Screen) {
   $("#loading-view").hidden = screen !== "loading";
   $("#circuit-section").hidden = screen !== "workspace";
   $("#cancel-load").hidden = screen !== "loading";
-  $("#replace-file").hidden = screen !== "workspace";
+  $("#replace-file").hidden = true;
+  $("#run-review").hidden = screen !== "workspace";
+  $("#more-menu").hidden = screen !== "workspace";
+  $("#fix-steps").hidden = screen !== "workspace" || $("#fix-steps").innerHTML === "";
   $("#topbar-file").hidden = screen === "landing";
   $("#file-divider").hidden = screen === "landing";
   document.querySelector<HTMLElement>(".topbar #topbar-board")!.hidden = screen === "loading";
@@ -337,12 +358,10 @@ function renderCircuit() {
   const board = boards.length === 1
     ? boardLabel(boards[0])
     : boards.length > 1 ? `${boards.length} Arduino boards` : "Board not identified";
-  $("#circuit-title").textContent = filename;
   $("#topbar-filename").textContent = filename;
-  $("#topbar-board").textContent = board;
+  $("#topbar-board").textContent = `${board} · ${circuit.components.length} component${circuit.components.length === 1 ? "" : "s"}`;
   $("#topbar-file").hidden = false;
   $("#file-divider").hidden = false;
-  $("#circuit-summary").textContent = `${board} · ${circuit.components.length} components · ${circuit.nets.filter(n => n.nodes.length > 1).length} connections`;
   $("#canvas-empty").hidden = circuit.components.length > 0 || circuit.nets.length > 0;
   renderView();
   renderInspector();
@@ -417,6 +436,8 @@ function renderList() {
   }
 }
 function renderInspector() {
+  // The problems panel explains findings; the drawer is for things picked on the canvas or in a list.
+  $("#inspector").hidden = !circuit || !selection || !!selectedFinding;
   const findingPanel = $("#selected-finding");
   findingPanel.hidden = !selectedFinding;
   findingPanel.innerHTML = selectedFinding ? `<div class="finding-detail ${selectedFinding.severity}"><span class="finding-severity">${selectedFinding.severity === "warning" ? "Check this connection" : "Information"}</span><h3>${esc(selectedFinding.title)}</h3><p>${esc(selectedFinding.message)}</p><p><strong>What to check:</strong> ${esc(selectedFinding.suggestion)}</p>${sourceLinks(selectedFinding.sources || [])}</div>` : "";
@@ -479,65 +500,67 @@ async function explainSelection(mode: "explain" | "power-trace" = "explain") {
   }, mode);
 }
 
-function sourceLinks(sources: { title: string; url: string }[]) {
-  return sources.filter(source => ["https://www.nxp.com/docs/", "https://docs.arduino.cc/", "https://www.buydisplay.com/", "https://www.vishay.com/", "https://github.com/KiCad/kicad-symbols/"].some(prefix => source.url.startsWith(prefix))).map(source => `<a class="spec-source" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)} ↗</a>`).join("");
+let expandedFinding: string | null = null;
+let checkedAt: number | null = null;
+function hiddenPinCount() {
+  return circuit ? circuit.nets.filter(net => net.nodes.length < 2).length : 0;
+}
+function fixSteps(done: boolean) {
+  const steps = ["Find it in red", "Fix it in KiCad", "Upload the fixed file"];
+  return steps.map((label, i) => `<li class="s${done ? " done" : i === 0 ? " on" : ""}"><span class="n">${done ? sym("i-check") : i + 1}</span>${label}</li>`).join('<li class="line" aria-hidden="true"></li>');
+}
+function renderKey() {
+  const key = $("#canvas-key");
+  if (review.status !== "success") { key.innerHTML = ""; return; }
+  const { problems } = groupFindings(review.result);
+  if (problems.length) {
+    const first = problems.find(p => p.id === expandedFinding) || problems[0];
+    const others = problems.filter(p => p !== first);
+    key.innerHTML = `<s class="swatch red"></s>Red = ${first.rule === "power_ground_short" ? "the short" : "the problem"}${others.length ? `<span class="nums">${others.map(p => `<i>${problems.indexOf(p) + 1}</i>`).join("")}</span>other problem${others.length === 1 ? "" : "s"}` : ""}`;
+  } else if (!boardRecognized(review.result)) key.innerHTML = '<i class="kdot grey"></i>Board checks skipped';
+  else key.innerHTML = '<i class="kdot green"></i>Nothing to flag';
 }
 function renderReview() {
   renderMeter();
   const button = $<HTMLButtonElement>("#run-review");
   button.disabled = review.status === "loading";
-  button.textContent = review.status === "loading" ? "Checking…" : review.status === "success" ? "Check again" : review.status === "error" ? "Retry" : "Check connections";
-  const panel = $("#review-results");
-  if (review.status === "idle") { panel.innerHTML = ""; return; }
-  if (review.status === "loading") { panel.innerHTML = '<p class="review-note" role="status">Checking your circuit connections…</p>'; return; }
-  if (review.status === "error") { panel.innerHTML = `<p class="explanation-error" role="alert">${esc(review.message)}</p>`; return; }
-  const result = review.result;
-  const warnings = result.findings.filter(f => f.severity === "warning");
-  const information = result.findings.filter(f => f.severity === "info");
-  const unconnected = information.filter(f => f.rule === "single_pin_net" || f.rule === "unassigned_pin");
-  const groups = information.filter(f => f.rule === "isolated_group");
-  const pullups = information.filter(f => f.rule === "i2c_pullup_check");
-  const other = information.filter(f => !unconnected.includes(f) && !groups.includes(f) && !pullups.includes(f));
-  const required = result.requirements;
-  const uncertainRequirements = (required?.unverified_pins.length || 0) + (required?.skipped_pins.length || 0) + (result.voltage?.unverified_parts || 0) + (result.i2c?.unverified_pins || 0);
-  const heading = result.status === "incomplete" ? "Not enough information to check this circuit" : warnings.length ? `${warnings.length} wiring problem${warnings.length === 1 ? "" : "s"} to check` : groups.length ? `${groups.length} separate group${groups.length === 1 ? "" : "s"} to check` : uncertainRequirements ? "Some connections need a closer look" : required?.checked_pins ? "No issues found in the supported wiring checks" : result.electrical.checked_nets ? "No Arduino power-wire conflicts found" : "No supported power connections to check";
-  const connectionFor = (f: Finding) => {
-    const selector = f.selection;
-    const net = 'net_code' in selector ? circuit?.nets.find(n => n.code === selector.net_code) : null;
-    return net && circuit ? connectionLabel(circuit, net) : 'ref' in selector ? `${selector.ref} · Pin ${selector.pin}` : f.title;
-  };
-  panel.innerHTML = `<h3 class="review-summary">${esc(heading)}</h3>
-    <p class="review-note">Checks power connections, supply voltage and SDA/SCL wiring for recognized parts.</p>
-    ${warnings.length ? `<div class="finding-list">${warnings.map(f => `<button class="finding-card warning" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(connectionFor(f))}</p>${(f.rule.startsWith("required_") || f.rule === "supply_voltage_mismatch" || f.rule.startsWith("i2c_")) ? `<p>${esc(f.message)}</p>` : ""}<p><b>What to do:</b> ${esc(f.suggestion)}</p><small>Show this connection →</small></button>`).join("")}</div>` : ""}
-    ${result.voltage?.checks.length ? `<div class="review-note"><strong>Supply voltage</strong>${result.voltage.checks.map(part => `<p>${esc(part.ref)}${part.pin ? ` · Pin ${esc(part.pin)}` : ""}: ${part.status === "unverified" ? `Not verified. ${esc(part.reason)}` : `${esc(part.nominal_voltage)}V nominal — ${part.status === "within_range" ? "within" : "outside"} the ${esc(part.operating_range?.min)}–${esc(part.operating_range?.max)}V operating range.`}</p>`).join("")}</div>` : ""}
-    ${result.i2c?.checks.some(pin => pin.status === "connected" || pin.status === "unverified") ? `<div class="review-note"><strong>I2C signal wires</strong>${result.i2c.checks.filter(pin => pin.status === "connected" || pin.status === "unverified").map(pin => `<p>${esc(pin.message)}</p>`).join("")}</div>` : ""}
-    ${pullups.length ? `<details class="review-details"><summary>Pull-up resistors · ${result.pullups?.checks.filter(p => p.status === "external_path_found").length || 0} of ${pullups.length} signal pins have an external path</summary><p>These resistors connect signal wires to a supply. Some modules include them onboard.</p><div class="finding-list">${pullups.map(f => `<button class="finding-card info" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(f.message)}</p><small>Show wiring →</small></button>`).join("")}</div></details>` : ""}
-    ${groups.length ? `<div class="finding-list">${groups.map(f => `<button class="finding-card info" data-finding="${esc(f.id)}"><strong>${esc(f.title)}</strong><p>${esc(f.message)}</p><small>Show these parts →</small></button>`).join("")}</div>` : ""}
-    ${unconnected.length ? `<details class="review-details"><summary>${unconnected.length} pins with no connection</summary><p>These may be intentional. Select a pin to check whether your design needs it.</p><div class="unconnected-list">${unconnected.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(connectionFor(f))}<span>Show pin →</span></button>`).join("")}</div></details>` : ""}
-    <details class="review-details"><summary>Check details</summary>
-      ${other.map(f => `<button class="unconnected-row" data-finding="${esc(f.id)}">${esc(f.title)}<span>Show details →</span></button>`).join("")}
-      ${result.isolation ? `<p>${result.isolation.group_count} connected component group${result.isolation.group_count === 1 ? "" : "s"} found. Grouping shows which parts share wiring; it does not prove electrical operation.</p>` : ""}
-      <p>${result.summary.marked_unused_pins} pins marked intentionally unused in the file.</p>
-      <p>${result.electrical.checked_nets} power/ground nets checked. ${esc(result.electrical.checks.join("; "))}.</p>
-      ${result.electrical.recognized_parts.map(part => `<p><strong>${esc(part.ref)} · ${esc(part.name)}</strong></p>${sourceLinks(part.sources)}`).join("")}
-      ${required?.recognized_parts.length ? `<p><strong>Required power/GND connections</strong>: ${required.checked_pins} pins checked; ${required.connected_pins} have a direct wire route to a known Arduino supply/ground pin. This does not verify voltage or operation.</p>${required.recognized_parts.map(part => `<p>${esc(part.ref)} · ${esc(part.name)}</p>${sourceLinks(part.sources)}`).join("")}` : ""}
-      ${required ? [...required.unverified_pins, ...required.skipped_pins].map(pin => `<p><strong>${esc(pin.ref)} · Pin ${esc(pin.pin)}:</strong> ${esc(pin.reason)}</p>`).join("") : ""}
-      ${result.voltage?.checks.map(part => `<p><strong>${esc(part.ref)} supply specification</strong></p>${sourceLinks(part.sources)}`).join("") || ""}
-      ${result.i2c?.checks.length ? `<p>${esc(result.i2c.scope)}</p>${sourceLinks([...new Map(result.i2c.checks.flatMap(pin => pin.sources).map(source => [source.url, source])).values()])}` : ""}
-      ${result.pullups?.checks.length ? `<p>${esc(result.pullups.scope)}</p>` : ""}
-      ${result.voltage?.unknown_components.length ? `<p>Supply voltage not verified for unknown parts: ${esc(result.voltage.unknown_components.join(", "))}.</p>` : ""}
-      ${result.electrical.unknown_components.length ? `<p>No current-limit checks for: ${esc(result.electrical.unknown_components.join(", "))}.</p>` : ""}
-      ${result.cannot_verify.map(item => `<p><strong>${esc(item.check)}:</strong> ${esc(item.reason)}</p>`).join("")}
-    </details>`;
+  button.innerHTML = `${sym("i-beep", "beep")}${review.status === "loading" ? "Checking…" : review.status === "idle" ? "Check connections" : "Check again"}`;
+  const problems = review.status === "success" ? groupFindings(review.result).problems : [];
+  const clean = review.status === "success" && !problems.length;
+  const workspace = document.body.dataset.screen === "workspace";
+  button.hidden = !workspace || clean;
+  $("#replace-file").hidden = !workspace || !clean || !(review.status === "success" && boardRecognized(review.result));
+  $("#fix-steps").hidden = !problems.length;
+  $("#fix-steps").innerHTML = problems.length ? fixSteps(false) : "";
+  renderKey();
+  if (!circuit) { $("#review-results").innerHTML = ""; return; }
+  const boards = circuit.components.filter(c => componentKind(c) === "board");
+  $("#review-results").innerHTML = reviewPanelHtml(review, {
+    circuit, expanded: expandedFinding, hiddenPins: hiddenPinCount(), showingUnused: showUnused, checkedAt,
+    unrecognizedBoard: boards.length > 0,
+  });
 }
 async function runReview() {
   if (!circuit) return;
   clearExplanation();
   selectedFinding = null;
   renderInspector();
-  await reviewRequest.run(circuit.storage.circuit_id, state => { review = state; renderReview(); });
+  expandedFinding = null;
+  await reviewRequest.run(circuit.storage.circuit_id, state => {
+    review = state;
+    if (state.status === "success") checkedAt = Date.now();
+    renderReview();
+    // Open on the answer: the first problem is already drawn in red.
+    const first = state.status === "success" ? groupFindings(state.result).problems[0] : null;
+    if (first) showFinding(first.id, false);
+  });
 }
-function inspectFinding(id: string) {
+function showFinding(id: string, reveal = true) {
+  if (review.status !== "success") return;
+  if (review.result.findings.some(f => f.id === id && f.severity === "warning")) { expandedFinding = id; renderReview(); }
+  inspectFinding(id, reveal);
+}
+function inspectFinding(id: string, reveal = true) {
   if (review.status !== "success") return;
   const finding = review.result.findings.find(f => f.id === id);
   if (!finding) return;
@@ -556,14 +579,27 @@ function inspectFinding(id: string) {
   $<HTMLInputElement>("#search").value = "";
   renderView();
   renderInspector();
-  $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
+  renderMeter();
+  if (reveal) $(".explorer-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 document.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
-  if (target.closest("#run-review:not(:disabled)")) void runReview();
+  if (target.closest("#run-review:not(:disabled), [data-run-review]")) void runReview();
   const finding = target.closest<HTMLElement>("[data-finding]");
-  if (finding) inspectFinding(finding.dataset.finding!);
+  if (finding) showFinding(finding.dataset.finding!);
+  const expand = target.closest<HTMLElement>("[data-expand-finding]");
+  if (expand) showFinding(expand.dataset.expandFinding!);
+  if (target.closest("[data-toggle-unused]")) setShowUnused(!showUnused);
+  if (target.closest("[data-open-trace]")) {
+    $("#circuit-section").classList.add("trace-open");
+    $("#path-panel").scrollIntoView({ block: "nearest" });
+    $("#path-panel").querySelector<HTMLElement>("summary, select")?.focus();
+  }
+  if (target.closest("#close-inspector")) { selection = null; graph?.select(null); renderInspector(); }
+  const menu = $("#more-list");
+  if (target.closest("#more-button")) setMenu(menu.hidden !== false);
+  else if (!menu.hidden && (!target.closest("#more-list") || target.closest("button"))) setMenu(false);
   if (target.closest(".upload-trigger:not(:disabled)")) $("#file-input").click();
   if (target.closest(".sample-trigger:not(:disabled)")) {
     $<HTMLDialogElement>("#help-dialog").close();
@@ -584,7 +620,7 @@ document.addEventListener("click", (event) => {
     query = "";
     $<HTMLInputElement>("#search").value = "";
     renderView();
-    $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
+    $(".explorer-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
   if (target.closest("#explain-connection:not(:disabled)")) void explainSelection();
   if (target.closest("#trace-power:not(:disabled)")) void explainSelection("power-trace");
@@ -630,11 +666,21 @@ $<HTMLInputElement>("#search").addEventListener("input", (event) => {
   graph?.search(query);
   if (view !== "graph") renderList();
 });
-$("#unused-toggle").addEventListener("change", (event) => {
-  showUnused = (event.target as HTMLInputElement).checked;
+function setShowUnused(value: boolean) {
+  showUnused = value;
+  $<HTMLInputElement>("#unused-toggle").checked = value;
   renderView();
   renderInspector();
-});
+  renderReview();
+}
+$("#unused-toggle").addEventListener("change", (event) => setShowUnused((event.target as HTMLInputElement).checked));
+function setMenu(open: boolean) {
+  $("#more-list").hidden = !open;
+  $("#more-button").setAttribute("aria-expanded", String(open));
+  if (open) $("#more-list").querySelector<HTMLElement>("button")?.focus();
+}
+// Keep "checked just now" honest as time passes.
+setInterval(() => { if (document.body.dataset.screen === "workspace" && review.status === "success") renderReview(); }, 60000);
 $("#zoom-in").onclick = () => graph?.zoomBy(1.2);
 $("#zoom-out").onclick = () => graph?.zoomBy(1 / 1.2);
 $("#fit-view").onclick = () => graph?.fit();
@@ -648,7 +694,7 @@ function setExpanded(expanded: boolean) {
 }
 $("#expand-canvas").onclick = () => setExpanded(!$(".explorer-panel").classList.contains("expanded"));
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape") { setExpanded(false); cancelLoad(); }
+  if (event.key === "Escape") { setExpanded(false); cancelLoad(); if (!$("#more-list").hidden) { setMenu(false); $("#more-button").focus(); } }
   // The shortcut shown on the "Choose .net file" button.
   if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "o"
       && document.body.dataset.screen !== "loading" && serviceOnline && !document.querySelector("dialog[open]")) {
