@@ -13,14 +13,14 @@ Built for [Graph Hacks: Context for AI Agents](https://www.wemakedevs.org/hackat
 CircuitDoctor checks the wiring described in a file. It is not a circuit simulator,
 and a result with no warnings does not certify that hardware is safe or working.
 
-[Live website](https://circuitdoctor-production.up.railway.app/) ·
+[Live website](https://circuitdoctor.up.railway.app/) ·
 [Run locally](#run-with-docker) · [Try the test circuits](#try-it-without-kicad) ·
 [Graph model](#how-falkordb-does-the-work) · [Queries](#queries-the-product-runs) ·
 [Supported checks](#what-works) · [Development](#develop-locally)
 
 ## Try it online
 
-Open **[CircuitDoctor](https://circuitdoctor-production.up.railway.app/)** — no local
+Open **[CircuitDoctor](https://circuitdoctor.up.railway.app/)** — no local
 installation or API key is needed. Upload your own KiCad `.net` file, or download
 the test-circuit ZIP from the landing page to try the faulty and corrected files.
 Gemini chat is enabled on the hosted app, subject to available API quota.
