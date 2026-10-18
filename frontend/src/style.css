@@ -179,6 +179,11 @@ dialog p { font-size: 12px; line-height: 1.7; color: var(--muted); }
 /* A movable circuit workbench. */
 .explorer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .graph-view { touch-action: none; }
+.canvas-focus { position: absolute; top: 12px; left: 15px; right: 15px; width: fit-content; max-width: calc(100% - 30px); display: flex; align-items: center; gap: 16px; background: #fff; border: 1px solid #dce8e5; border-radius: 9px; padding: 9px 12px; color: #294d46; font-size: 12px; box-shadow: 0 3px 14px #163c3510; }
+.canvas-wrap:has(.canvas-focus:not([hidden])) .canvas-hint { visibility: hidden; }
+.canvas-focus[hidden] { display: none; }
+.canvas-focus button { flex-shrink: 0; background: #eef6f3; border: 0; border-radius: 5px; padding: 5px 9px; font: inherit; font-weight: 600; color: #137b65; cursor: pointer; }
+.canvas-focus button:hover { background: #dceee6; }
 .canvas-wrap { height: max(500px, calc(100vh - 300px)); }
 .canvas-hint { top: 15px; bottom: auto; left: 15px; right: auto; padding: 7px 10px; border: 1px solid #e4ece7; border-radius: 6px; background: #fffffff0; color: #668174; font-size: 11px; }
 .reset-layout { border: 0; border-left: 1px solid #e0e7e3; background: none; color: #527061; padding: 6px 10px; margin-left: 5px; font-size: 11px; }

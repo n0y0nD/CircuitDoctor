@@ -18,6 +18,19 @@ function fixture(part = 'Arduino_UNO_R3') {
   return { component, circuit };
 }
 
+test('compact view keeps requested exported pins and full view keeps every pin', () => {
+  for (const part of ['Arduino_UNO_R3', 'Arduino_Nano_v3.x']) {
+    const {component,circuit} = fixture(part);
+    const compact=boardDrawing(circuit,component,new Set(['007','6']));
+    assert.deepEqual([...compact.ports.keys()].sort(),['007','6']);
+    assert.equal(compact.ports.get('007').label,'D13');
+    assert.equal(compact.ports.get('6').label,'GND');
+    assert.equal(compact.ports.get('007').side,'top');
+    assert.equal(boardDrawing(circuit,component).ports.size,4);
+    assert.equal(boardDrawing(circuit,component,new Set()).ports.size,0);
+  }
+});
+
 test('uses exported pin IDs instead of assuming D13 is pin 13 or 28', () => {
   const { component, circuit } = fixture();
   const board = boardDrawing(circuit, component);
@@ -34,7 +47,7 @@ test('separate ground terminals have distinct socket positions; unused pins are 
   for (const part of ['Arduino_UNO_R3', 'Arduino_Nano_v3.x']) {
     const { component, circuit } = fixture(part);
     const board = boardDrawing(circuit, component);
-    assert.notEqual(board.ports.get('6').y, board.ports.get('7').y);
+    assert.notDeepEqual([board.ports.get('6').x,board.ports.get('6').y], [board.ports.get('7').x,board.ports.get('7').y]);
     assert.equal(board.ports.get('9').connected, false);
     assert.equal(board.ports.size, 4);
   }
@@ -71,4 +84,20 @@ test('missing library metadata retains actual exported pins without inventing Ar
   assert.ok(!svg.includes('ATmega328P'));
   assert.equal(componentKind({ ...component, libsource: { lib: 'Custom', part: 'Arduino_Nano' } }), 'component');
   assert.equal(componentKind({ ...component, libsource: { lib: 'MCU_Module', part: 'Arduino_Nano_Every' } }), 'component');
+});
+
+ test('visible pin filtering preserves socket positions and Uno power exits below', () => {
+  const {component,circuit}=fixture();
+  const full=boardDrawing(circuit,component);
+  const compact=boardDrawing(circuit,component,new Set(['007','7','9']));
+  for(const [pin,port] of compact.ports) assert.deepEqual(port,full.ports.get(pin));
+  assert.equal(full.ports.get('007').side,'top');
+  assert.equal(full.ports.get('9').side,'bottom');
+});
+ test('unrecognized names get separate exported terminals, not guessed digital pins', () => {
+  const {component,circuit}=fixture();
+  circuit.libparts[0].pins[0].name='SPECIAL';
+  const board=boardDrawing(circuit,component);
+  assert.equal(board.ports.get('007').label,'SPECIAL');
+  assert.equal(board.ports.get('007').side,'right');
 });

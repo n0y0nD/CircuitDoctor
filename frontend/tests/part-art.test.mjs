@@ -53,3 +53,22 @@ test('ground appearance uses explicit ground names or exported ground pins, with
  assert.equal(isGroundNet(circuit,{...circuit.nets[0],name:'GND'}),true);
  assert.equal(isGroundNet(circuit,{...circuit.nets[0],nodes:[{ref:'A1',pin:'7',pinfunction:'GND'}]}),true);
 });
+
+test('display header terminals retain exported IDs and stay inside the drawing',()=>{
+ const {component,circuit}=fixture('Display_Character','LCD-016N002L',Array.from({length:16},(_,i)=>[String(i+1),`P${i+1}`]));
+ const drawing=partDrawing(circuit,component);
+ assert.equal(drawing.ports.size,16);
+ for(const port of drawing.ports.values()) {
+   assert.equal(port.side,'top');
+   assert.ok(port.x>0 && port.x<drawing.width && port.y>0 && port.y<drawing.height);
+ }
+ assert.equal(new Set([...drawing.ports.values()].map(p=>p.x)).size,16);
+});
+
+test('unknown diode polarity does not invent a cathode stripe',()=>{
+ const {component,circuit}=fixture('Device','D',[['01','unknown'],['02','unknown']]);
+ const svg=decodeURIComponent(partDrawing(circuit,component).image.split(',')[1]);
+ assert.ok(!svg.includes('M128 42V75'));
+ assert.ok(svg.includes('Pin 01'));
+ assert.ok(svg.includes('Pin 02'));
+});

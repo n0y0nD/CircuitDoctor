@@ -103,7 +103,7 @@ $("#app").innerHTML = `
       </section>
       <aside class="inspector" aria-label="Connection details"><div class="panel-heading"><h2>Connection details</h2></div><div id="selected-finding" hidden></div><div id="inspector-body"></div><section id="explanation-panel" class="explanation-panel" aria-label="Connection explanation" hidden></section></aside>
     </div>
-    <p class="scope-note">Gold sockets are connected pins. Drag the open circles to route wires. Board labels form an enlarged pin map, not a physical wiring template.</p>
+    <p class="scope-note">Gold sockets are connected pins. Drag the open circles to route wires. Board drawings are illustrative; pin names come from your file.</p>
     <section id="chat-panel" class="chat-panel" aria-label="Ask about your circuit" hidden></section>
   </section>
 </main>
@@ -215,10 +215,7 @@ async function readCircuit(
     $<HTMLInputElement>("#unused-toggle").checked = false;
     query = "";
     $<HTMLInputElement>("#search").value = "";
-    const first =
-      result.components.find((c) => componentKind(c) === "board") ||
-      result.components[0];
-    selection = first ? { kind: "component", id: first.ref } : null;
+    selection = null;
     connectionState(true);
     renderCircuit();
   } catch (error) {
@@ -310,7 +307,7 @@ function renderView() {
     );
     graph.select(selection);
     graph.search(query);
-    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null));
+    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null), selectedFinding ? "issue" : "route");
   } else renderList();
   const shown = visibleNets(circuit, showUnused, selection).length;
   $("#graph-summary").textContent =
