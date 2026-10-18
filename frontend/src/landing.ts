@@ -38,7 +38,7 @@ function bench() {
         <text x="48" y="79" text-anchor="middle" font-size="10" font-weight="600" fill="#C7CBB2" letter-spacing="1">SHORT</text>
         <text x="78" y="79" font-size="10" fill="#4a4e3f" letter-spacing=".4">· same wire</text>
       </g>
-      ${segments(170, 26, .46, ['S', 'H', 'r', 't'])}
+      <text x="236" y="63" text-anchor="middle" font-size="32" font-weight="600" fill="#20231A">SHORT</text>
     </g>
   </svg>`;
 }
@@ -70,7 +70,7 @@ export function landingHtml() {
   <footer class="foot">
     <div class="feats">
       <div class="feat"><span class="dial">Ω</span><div><b>Graph-backed wiring checks</b><small>Shorts, rails, power pins, I2C</small></div></div>
-      <div class="feat"><span class="dial" style="font-size:10px">↔</span><div><b>Trace any connection</b><small>Pin to pin, every hop shown</small></div></div>
+      <div class="feat"><span class="dial" style="font-size:10px">↔</span><div><b>Trace a connection</b><small>Pin to pin, every hop shown</small></div></div>
       <div class="feat"><span class="dial">?</span><div><b>Ask AI with evidence</b><small>Answers explain your connections</small></div></div>
     </div>
     <div class="pow">Connections from your file. No circuit simulation.</div>
@@ -114,8 +114,8 @@ function belowFoldHtml() {
   </div>
 </section>
 <section class="sec" id="checks" aria-labelledby="checks-title">
-  <div class="sh"><div>${kicker('02', 'What it checks')}<h2 class="display" id="checks-title">The mistakes that<br>cook boards.</h2></div>
-    <p>Every check reads the connections in your file, so the same file always gives the same answer. Power and I2C checks cover the Arduino Uno R3, the classic Nano and supported OLED / LCD displays.</p></div>
+  <div class="sh"><div>${kicker('02', 'What it checks')}<h2 class="display" id="checks-title">Wiring problems<br>we check</h2></div>
+    <p>Wiring checks use fixed rules on the connections in your file, so the same file produces the same wiring-check results. Power and I2C checks cover the Arduino Uno R3, the classic Nano and supported OLED / LCD displays.</p></div>
   <div class="checks">
     <div>
       <div class="ck"><span class="n">01</span><b>Power shorted to ground</b><code>5V ↔ GND</code></div>
@@ -127,7 +127,7 @@ function belowFoldHtml() {
       <div class="ck"><span class="n">05</span><b>I2C SDA / SCL swapped or missing</b><code>board I2C pins</code></div>
       <div class="ck"><span class="n">06</span><b>Pull-up resistors on I2C</b><code>SDA · SCL</code></div>
       <div class="ck"><span class="n">07</span><b>Unconnected pins &amp; parts cut off</b><code>every part</code></div>
-      <div class="ck"><span class="n">08</span><b>Trace any two pins</b><code>pin → pin</code></div>
+      <div class="ck"><span class="n">08</span><b>Find a route between pins</b><code>pin → pin</code></div>
     </div>
   </div>
   <p class="checks-note"><span class="ok-dot">${sym('i-check')}</span>Checks that pass stay quiet. Other parts are still shown, and checked for unconnected pins and separate groups.</p>
@@ -156,7 +156,7 @@ function belowFoldHtml() {
         <path d="M692 118H732M732 84V152M732 84H760M732 118H760M732 152H760" fill="none" stroke="#BDB7AB" stroke-width="2"/>
         <circle cx="768" cy="84" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/><circle cx="768" cy="118" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/><circle cx="768" cy="152" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/>
         <text x="784" y="88" font-size="11" fill="#8A867E">A7·GND ×3</text><text x="784" y="122" font-size="11" fill="#8A867E">J9·2</text><text x="784" y="156" font-size="11" fill="#8A867E">R12·1</text>
-        <text x="440" y="208" text-anchor="middle" font-size="11.5" fill="#8A867E">Select a pin to explore the connections in your file.</text>
+        <text x="440" y="208" text-anchor="middle" font-size="11.5" fill="#8A867E">Upload your circuit to explore its connections.</text>
       </svg></div>
       <div class="query"><span class="lbl">Follow each connection</span><p class="res">Choose two pins to see their route, then select a connection to highlight it on the drawing.</p></div>
     </div>
@@ -171,7 +171,7 @@ function belowFoldHtml() {
     </div>
     <div>
       <div class="qa"><h3>Do I need an account?</h3><p><b>No.</b> Drop a file and you get results. Nothing to sign up for.</p></div>
-      <div class="qa"><h3>Does AI decide the result?</h3><p><b>No.</b> The checks are fixed rules, so they always give the same answer. AI only explains a result in plain words, and shows the evidence it used.</p></div>
+      <div class="qa"><h3>Does AI decide the result?</h3><p><b>No.</b> Wiring checks use fixed rules. AI explains the results and connections in plain words using your circuit’s evidence. Its wording can vary.</p></div>
     </div>
   </div>
 </section>
