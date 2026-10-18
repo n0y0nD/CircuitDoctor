@@ -39,7 +39,7 @@ export class VerifyPanel {
       input.value = '';
       if (!file || !this.circuit) return;
       this.result = null; this.onComparison(null);
-      void this.request.run(this.circuit.storage.circuit_id, file, state => this.renderState(state));
+      void this.request.run(this.circuit.storage.circuit_id, file, state => this.renderState(state, true));
     });
   }
   get comparison() { return this.result; }
@@ -86,11 +86,13 @@ export class VerifyPanel {
       <button type="button" class="btn pri lg verify-go" data-corrected-upload>${upload}Choose updated .net file</button>
       <div class="verify-result" aria-live="polite">${message}</div></div>`;
   }
-  private renderState(state: CompareState) {
+  private renderState(state: CompareState, openUpdated = false) {
     if (state.status === 'success') {
       this.result = state.result; this.correctedName = state.filename; this.comparedAt = Date.now();
       this.renderResult();
       this.onComparison(state.result);
+      // New uploads open their result; restoring a saved URL preserves its selected side.
+      if (openUpdated) void this.inspect(state.result.corrected_id, null, false);
       return;
     }
     this.root.innerHTML = this.startHtml(state.status === 'loading'
@@ -105,9 +107,10 @@ export class VerifyPanel {
     const viewingUpdated = this.viewingId === r.corrected_id;
     const minutes = Math.floor((Date.now() - this.comparedAt) / 60000);
     this.root.innerHTML = `<div class="prob compare">
-      <div class="found">${fixed ? `<span class="ok-dot lg">${check}</span>` : remaining ? '<span class="cnt">!</span>' : '<span class="dial info-dial">i</span>'}<h2>${fixed ? 'Fixed' : remaining ? 'Not fixed yet' : 'Compared'}</h2><span class="meta">compared ${minutes < 1 ? 'just now' : `${minutes} min ago`}</span><button type="button" class="x" data-close-verify aria-label="Close comparison">×</button></div>
+      <div class="found">${fixed ? `<span class="ok-dot lg">${check}</span>` : remaining ? '<span class="cnt">!</span>' : '<span class="dial info-dial">i</span>'}<h2>${fixed ? (viewingUpdated ? 'Fixed' : 'Fixed in updated file') : remaining ? 'Not fixed yet' : 'Compared'}</h2><span class="meta">compared ${minutes < 1 ? 'just now' : `${minutes} min ago`}</span><button type="button" class="x" data-close-verify aria-label="Close comparison">×</button></div>
       <h3>${r.summary.resolved && !remaining ? `${r.summary.resolved} problem${r.summary.resolved === 1 ? '' : 's'} cleared.` : esc(comparisonHeadline(r))}</h3>
       <p class="cons"><span class="mono">${esc(this.names.before)}</span> → <span class="mono">${esc(this.correctedName)}</span></p>
+      <p class="tiny compare-viewing">Viewing the ${viewingUpdated ? 'updated' : 'earlier'} file${viewingUpdated ? '.' : ' — the drawing and meter show its original wiring.'}</p>
       ${comparisonHtml(r)}
       <div class="acts-row">${viewingUpdated
         ? '<button type="button" class="btn" data-side="before">← Open the earlier circuit</button>'

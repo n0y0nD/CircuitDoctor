@@ -203,10 +203,10 @@ function showChanges() {
   if (!result || !circuit) return;
   const viewingUpdated = circuit.storage.circuit_id === result.corrected_id;
   const problems = review.status === "success" ? groupFindings(review.result).problems : [];
-  const earlierFault = !viewingUpdated && (problems.find(p => p.id === expandedFinding) || problems[0]);
-  if (earlierFault) {
+  const visibleFault = problems.find(p => p.id === expandedFinding) || problems[0];
+  if (visibleFault) {
     showEvidence(null);
-    showFinding(earlierFault.id, false);
+    showFinding(visibleFault.id, false);
   } else {
     const evidence = changeEvidence(result, viewingUpdated);
     showEvidence(evidence.nodes.length ? evidence : null, false, "Showing · what changed", "compare");

@@ -17,3 +17,12 @@ test('probes stay readable at any zoom and only appear for ends that exist', () 
   assert.match(svg, />2</);
   assert.equal(probesSvg(null, null, [], 1), '');
 });
+
+
+test('probe artwork clears labels while keeping endpoint rings outside the mask', () => {
+  const svg = probesSvg({x: 40, y: 60, fromAbove: true}, null, [], 1,
+    [{x1: 10, y1: 20, w: 30, h: 12}, {x1: NaN, y1: 0, w: 1, h: 1}]);
+  assert.match(svg, /x="7.0" y="17.0" width="36.0" height="18.0" fill="black"/);
+  assert.match(svg, /<g mask="url\(#probe-label-mask\)"><use[^>]+\/><\/g><circle/);
+  assert.doesNotMatch(svg, /NaN/);
+});

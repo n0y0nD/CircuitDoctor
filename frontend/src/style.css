@@ -745,3 +745,19 @@ body:has(.explorer-panel.expanded) { overflow: hidden; }
 .probe-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 4; }
 .thread:has(.nokey) { flex: none; overflow: visible; padding-top: 18px; }
 .ask:has(.nokey) { flex: none; min-height: 0; }
+
+/* Keep desktop actions visible without wrapping the workspace header. */
+@media (min-width: 861px) {
+  .topbar { flex-wrap: nowrap; gap: 12px; padding-top: 0; padding-bottom: 0; }
+  .topbar > .brand { flex: none; }
+  .topbar .file { flex: 1 1 220px; min-width: 0; overflow: hidden; }
+  .topbar .file > svg { flex: none; }
+  .topbar .file b { flex: 1 1 auto; }
+  .topbar .file span { flex: 0 1 120px; }
+  .fix-steps { flex: none; gap: 6px; font-size: 12px; }
+  .fix-steps .line { width: 12px; }
+  .header-actions { gap: 6px; }
+}
+@media (min-width: 861px) and (max-width: 1279px) {
+  .fix-steps { display: none; }
+}

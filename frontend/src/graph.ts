@@ -371,7 +371,9 @@ export class CircuitGraph {
       while (markers.some(m => Math.hypot(m.x - x, m.y - y) < 24)) x += 26;
       markers.push({ n: marker.n, x, y });
     }
-    this.overlay.innerHTML = probesSvg(this.end(targets.red), this.end(targets.black), markers, this.cy.zoom());
+    const labels = this.cy.nodes().filter(n => !!n.data('label') || n.hasClass('tagged')).map(n =>
+      n.renderedBoundingBox({ includeNodes: false, includeEdges: false, includeLabels: true, includeOverlays: false }));
+    this.overlay.innerHTML = probesSvg(this.end(targets.red), this.end(targets.black), markers, this.cy.zoom(), labels);
   }
   clearFocus() {
     this.setProbes(null);
