@@ -1,5 +1,8 @@
-import "@fontsource-variable/inter";
+import "@fontsource-variable/bricolage-grotesque/standard.css";
+import "@fontsource-variable/jetbrains-mono";
 import "./style.css";
+import probeSymbols from "./assets/probe-symbols.svg?raw";
+import { meterHtml, reviewReading, type Reading } from "./meter";
 import { VerifyPanel } from "./verify-panel";
 import { comparisonFromHash, circuitHash } from "./verify-fix";
 import { PathPanel } from "./path-panel";
@@ -7,7 +10,7 @@ import type { ChatComparison } from "./chat";
 import { ChatPanel } from "./chat-panel";
 import type { Explanation } from "./explanation";
 import { renderConnectionExplanation } from "./connection-explanation";
-import { icon } from "./icons";
+import { icon, sym } from "./icons";
 import { CircuitGraph } from "./graph";
 import { ExplanationRequest, singleEvidencePin, type ExplanationState } from "./explanation";
 import { ReviewRequest, type ReviewState, type Finding } from "./review";
@@ -60,10 +63,13 @@ function clearExplanation() {
   graph?.highlightEvidence(null);
 }
 
+document.body.insertAdjacentHTML("afterbegin", probeSymbols);
 $("#app").innerHTML = `
 <header class="topbar">
-  <a class="brand" href="/" aria-label="CircuitDoctor home"><img src="/favicon.svg" alt=""/>CircuitDoctor</a>
-  <div class="header-actions"><span class="connection-status" id="connection-status" role="status"><i></i> Connecting…</span><button class="button secondary upload-trigger" id="replace-file" hidden>${icon("upload", 16)} Upload another</button><button class="icon-button help-trigger" aria-label="How to export a netlist" title="How to export a netlist">${icon("help")}</button></div>
+  <a class="brand sm" href="/" aria-label="CircuitDoctor home">${sym("cd-logo")}CircuitDoctor</a>
+  <span class="vr" id="file-divider" hidden></span>
+  <div class="file" id="topbar-file" hidden>${sym("i-netfile")}<b id="topbar-filename"></b><span id="topbar-board"></span></div>
+  <div class="header-actions"><span class="stat" id="connection-status" role="status"><i class="live wait"></i>Connecting…</span><button class="btn upload-trigger" id="replace-file" hidden>${sym("i-upload")}Upload another</button><button class="btn quiet help-trigger" aria-label="How to export a netlist" title="How to export a netlist">${icon("help", 16)}Help</button></div>
 </header>
 <main>
   <input id="file-input" type="file" accept=".net" hidden />
@@ -107,7 +113,7 @@ $("#app").innerHTML = `
     <section id="chat-panel" class="chat-panel" aria-label="Ask about your circuit" hidden></section>
   </section>
 </main>
-<footer>Connections from your file. No circuit simulation.</footer>
+<footer class="statusbar"><div id="meter"></div><div class="st"><span id="db-status"><i class="live wait"></i>FalkorDB…</span><span class="d">·</span><span>Connections from your file. No circuit simulation.</span></div></footer>
 <div class="drop-overlay" id="drop-overlay" hidden>${icon("upload", 32)}<strong>Drop your .net file</strong></div>
 <dialog id="help-dialog" aria-labelledby="help-title"><button class="icon-button dialog-close" id="close-help" aria-label="Close help">${icon("close")}</button><h2 id="help-title">Export your circuit from KiCad</h2><ol><li>Open your circuit in the schematic editor.</li><li>Select <strong>File → Export → Netlist</strong>.</li><li>Choose the <strong>KiCad</strong> format and save the <strong>.net</strong> file.</li><li>Upload that file here to explore its connections.</li></ol><p>Images, PCB files and schematics cannot be uploaded directly.</p><button class="button primary" id="got-it">Got it</button></dialog>`;
 
@@ -148,7 +154,14 @@ const pathPanel = new PathPanel($("#path-panel"), showEvidence);
 function connectionState(online: boolean) {
   const element = $("#connection-status");
   element.classList.toggle("offline", !online);
-  element.innerHTML = `<i></i> ${online ? "Ready" : "Service unavailable"}`;
+  element.innerHTML = `<i class="live"></i>Graph DB ${online ? "connected" : "offline"}`;
+  $("#db-status").classList.toggle("offline", !online);
+  $("#db-status").innerHTML = `<i class="live"></i>FalkorDB ${online ? "connected" : "offline"}`;
+}
+// The status-bar meter: words only (SHORT, PASS, TRACE…), never a measured value.
+let meterOverride: Reading | null = null;
+function renderMeter() {
+  $("#meter").innerHTML = circuit ? meterHtml(meterOverride || reviewReading(review)) : "";
 }
 function notice(message = "") {
   $("#notice").textContent = message;
@@ -260,11 +273,16 @@ function renderCircuit() {
     ? boardLabel(boards[0])
     : boards.length > 1 ? `${boards.length} Arduino boards` : "Board not identified";
   $("#circuit-title").textContent = filename;
+  $("#topbar-filename").textContent = filename;
+  $("#topbar-board").textContent = board;
+  $("#topbar-file").hidden = false;
+  $("#file-divider").hidden = false;
   $("#circuit-summary").textContent = `${board} · ${circuit.components.length} components · ${circuit.nets.filter(n => n.nodes.length > 1).length} connections`;
   $("#canvas-empty").hidden = circuit.components.length > 0 || circuit.nets.length > 0;
   renderView();
   renderInspector();
   renderReview();
+  renderMeter();
 }
 function selectItem(value: Selection) {
   selectedFinding = null;
@@ -400,6 +418,7 @@ function sourceLinks(sources: { title: string; url: string }[]) {
   return sources.filter(source => ["https://www.nxp.com/docs/", "https://docs.arduino.cc/", "https://www.buydisplay.com/", "https://www.vishay.com/", "https://github.com/KiCad/kicad-symbols/"].some(prefix => source.url.startsWith(prefix))).map(source => `<a class="spec-source" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.title)} ↗</a>`).join("");
 }
 function renderReview() {
+  renderMeter();
   const button = $<HTMLButtonElement>("#run-review");
   button.disabled = review.status === "loading";
   button.textContent = review.status === "loading" ? "Checking…" : review.status === "success" ? "Check again" : review.status === "error" ? "Retry" : "Check connections";
@@ -577,6 +596,9 @@ $("#clear-circuit").onclick = () => {
   $("#welcome").hidden = false;
   $("#circuit-section").hidden = true;
   $("#replace-file").hidden = true;
+  $("#topbar-file").hidden = true;
+  $("#file-divider").hidden = true;
+  renderMeter();
   notice();
   setBusy(false);
   $(".welcome .upload-trigger").focus();

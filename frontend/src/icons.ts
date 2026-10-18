@@ -36,3 +36,8 @@ const paths: Record<string, string> = {
 export function icon(name: string, size = 20) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.chip}</svg>`;
 }
+
+/** A symbol from the inlined Probe sprite (probe-symbols.svg). */
+export function sym(id: string, className = '') {
+  return `<svg${className ? ` class="${className}"` : ''} aria-hidden="true"><use href="#${id}"/></svg>`;
+}

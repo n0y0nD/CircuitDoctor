@@ -10,6 +10,7 @@ export interface Finding {
   selection: { net_code: string } | { ref: string; pin: string } | { component_refs: string[] };
   evidence: Explanation['evidence'];
   sources?: { title: string; url: string }[];
+  specifications?: { ref: string; pin: string; name: string; role?: string; nominal_voltage?: number }[];
 }
 export interface Review {
   source: 'falkordb';
