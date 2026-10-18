@@ -50,12 +50,12 @@ export function landingHtml() {
   <div class="fold">
   <header class="nav">
     <a class="brand" href="/" aria-label="CircuitDoctor home">${sym('cd-logo')}CircuitDoctor</a>
-    <nav class="navr" aria-label="Site"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a><span class="stat" id="landing-status" role="status"><i class="live wait"></i>Graph DB…</span></nav>
+    <nav class="navr" aria-label="Site"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a><span class="stat" id="landing-status" role="status"><i class="live wait"></i>Connecting…</span></nav>
   </header>
   <div class="hero">
     <p class="kicker">Continuity test <b>·)))</b> for KiCad netlists</p>
     <h1 class="display" id="welcome-title">Hear the short<br>before you <em>smell</em> it.</h1>
-    <p class="sub">CircuitDoctor probes every pin and net in your KiCad netlist, and beeps before the USB goes in.</p>
+    <p class="sub">CircuitDoctor probes every pin and net in your KiCad netlist, and highlights possible wiring problems before you connect your board.</p>
     <div class="bench-wrap">${bench()}</div>
     <section class="drop dropzone" id="dropzone" aria-live="polite">
       ${netDoc}
@@ -63,8 +63,7 @@ export function landingHtml() {
       <button class="btn pri lg upload-trigger" type="button">Choose .net file <span class="kbd">${openShortcut}</span></button>
     </section>
     <div class="links">
-      <button class="btn quiet sample-trigger" type="button">${sym('i-flask')}Try a sample circuit</button>
-      <i class="dot"></i>
+
       <button class="u help-trigger" type="button">Where do I get a .net file?</button>
     </div>
   </div>
@@ -72,23 +71,14 @@ export function landingHtml() {
     <div class="feats">
       <div class="feat"><span class="dial">Ω</span><div><b>Graph-backed wiring checks</b><small>Shorts, rails, power pins, I2C</small></div></div>
       <div class="feat"><span class="dial" style="font-size:10px">↔</span><div><b>Trace any connection</b><small>Pin to pin, every hop shown</small></div></div>
-      <div class="feat"><span class="dial">?</span><div><b>Ask AI with evidence</b><small>Answers cite the graph query</small></div></div>
+      <div class="feat"><span class="dial">?</span><div><b>Ask AI with evidence</b><small>Answers explain your connections</small></div></div>
     </div>
-    <div class="pow">Powered by <b>FalkorDB graph</b><br>Connections from your file. No circuit simulation.</div>
+    <div class="pow">Connections from your file. No circuit simulation.</div>
   </footer>
   </div>
   ${belowFoldHtml()}
 </section>`;
 }
-
-// The exact trace query from circuitdoctor/paths.py (PATH_QUERY, MAX_HOPS = 32).
-// tests/test_paths.py checks that this page still shows the real query.
-export const PATH_QUERY_LINES = [
-  'MATCH (a:Pin {id:$start}),(b:Pin {id:$end})',
-  'WITH shortestPath((a)-[:ON_NET|THROUGH*0..32]-(b)) AS route',
-  'RETURN nodes(route), relationships(route)',
-];
-const keyword = (line: string) => esc(line).replace(/^(MATCH|WITH|RETURN)\b/, '<span class="k">$1</span>').replace(/ AS route$/, ' <span class="k">AS</span> route');
 
 function belowFoldHtml() {
   const kicker = (n: string, text: string) => `<p class="kicker"><i>${n}</i>${text}</p>`;
@@ -144,33 +134,31 @@ function belowFoldHtml() {
 </section>
 <section class="sec" id="graph" aria-labelledby="graph-title">
   <div class="why">
-    <div>${kicker('03', 'Why a graph?')}<h2 class="display" id="graph-title">A circuit is<br>already a graph.</h2>
-      <p class="body">Parts have pins, and pins sit on wires (nets). We store your file exactly like that in <b>FalkorDB</b>, so “is 5V touching GND?” becomes one short question to the database.</p>
-      <p class="body">Tracing a connection is a single graph query: the shortest route from one pin to another, over wires and through 2-pin resistors. Every hop is shown, so you can see why.</p></div>
+    <div>${kicker('03', 'Follow the connections')}<h2 class="display" id="graph-title">A circuit is<br>already a graph.</h2>
+      <p class="body">Parts have pins, and pins sit on wires (nets). CircuitDoctor follows those connections to help you understand which pins share a wire.</p>
+      <p class="body">Trace the route between two pins over wires and through two-pin resistors. Each step shows which connection to inspect.</p></div>
     <div class="gpanel">
-      <div class="ph"><h2>How your file is stored</h2><span class="m"><i class="live"></i>FalkorDB</span></div>
+      <div class="ph"><h2>How parts connect</h2></div>
       <div class="gd"><svg viewBox="0 0 880 236" role="img" aria-label="A component has pins; each pin is on a net" font-family="JetBrains Mono, monospace">
         <rect x="56" y="70" width="176" height="96" rx="10" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="2"/>
         <text x="72" y="58" font-size="10.5" letter-spacing="1.2" fill="#8A867E">COMPONENT</text>
         <text x="76" y="110" font-family="Bricolage Grotesque Variable, Bricolage Grotesque, sans-serif" font-size="19" font-weight="650" fill="#1D1C1A">Arduino Uno</text>
         <text x="76" y="134" font-size="11.5" fill="#8A867E">A7 · Uno R3</text>
         <path d="M232 118H352" stroke="#1D1C1A" stroke-width="2"/><path d="M344 111l9 7-9 7" fill="none" stroke="#1D1C1A" stroke-width="2" stroke-linejoin="round"/>
-        <rect x="246" y="96" width="92" height="18" rx="4" fill="#EFECE5"/><text x="292" y="109" text-anchor="middle" font-size="10.5" fill="#55524C">HAS_PIN</text>
+        <rect x="246" y="96" width="92" height="18" rx="4" fill="#EFECE5"/><text x="292" y="109" text-anchor="middle" font-size="10.5" fill="#55524C">has pin</text>
         <text x="398" y="58" text-anchor="middle" font-size="10.5" letter-spacing="1.2" fill="#8A867E">PIN</text>
         <circle cx="398" cy="118" r="38" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="2"/>
         <text x="398" y="117" text-anchor="middle" font-size="15" font-weight="600" fill="#1D1C1A">5V</text><text x="398" y="135" text-anchor="middle" font-size="10.5" fill="#8A867E">pin 5</text>
         <path d="M436 118H556" stroke="#1D1C1A" stroke-width="2"/><path d="M548 111l9 7-9 7" fill="none" stroke="#1D1C1A" stroke-width="2" stroke-linejoin="round"/>
-        <rect x="452" y="96" width="88" height="18" rx="4" fill="#EFECE5"/><text x="496" y="109" text-anchor="middle" font-size="10.5" fill="#55524C">ON_NET</text>
+        <rect x="452" y="96" width="88" height="18" rx="4" fill="#EFECE5"/><text x="496" y="109" text-anchor="middle" font-size="10.5" fill="#55524C">on wire</text>
         <text x="576" y="58" font-size="10.5" letter-spacing="1.2" fill="#8A867E">NET</text>
         <rect x="560" y="96" width="132" height="44" rx="22" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="2"/><text x="626" y="123" text-anchor="middle" font-size="14" font-weight="600" fill="#1D1C1A">/SUPPLY</text>
         <path d="M692 118H732M732 84V152M732 84H760M732 118H760M732 152H760" fill="none" stroke="#BDB7AB" stroke-width="2"/>
         <circle cx="768" cy="84" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/><circle cx="768" cy="118" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/><circle cx="768" cy="152" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/>
         <text x="784" y="88" font-size="11" fill="#8A867E">A7·GND ×3</text><text x="784" y="122" font-size="11" fill="#8A867E">J9·2</text><text x="784" y="156" font-size="11" fill="#8A867E">R12·1</text>
-        <text x="440" y="208" text-anchor="middle" font-size="11.5" fill="#8A867E">uno_short.net → 3 components · 2 connections  ·  2-pin resistors add Pin –THROUGH→ Pin</text>
+        <text x="440" y="208" text-anchor="middle" font-size="11.5" fill="#8A867E">Select a pin to explore the connections in your file.</text>
       </svg></div>
-      <div class="query"><span class="lbl">Trace uses this query</span>
-<pre>${PATH_QUERY_LINES.map(keyword).join('\n')}</pre>
-        <p class="res">Same file in, same answer out <span class="d">·</span> separate groups use FalkorDB’s algo.WCC</p></div>
+      <div class="query"><span class="lbl">Follow each connection</span><p class="res">Choose two pins to see their route, then select a connection to highlight it on the drawing.</p></div>
     </div>
   </div>
 </section>
@@ -190,12 +178,12 @@ function belowFoldHtml() {
 <section class="close" aria-label="Upload a netlist">
   <svg class="doc" aria-hidden="true"><use href="#i-netfile"/></svg>
   <div><h3>Ready when your board is.</h3><p>KiCad netlist · .net · up to 10 MiB · Arduino Uno R3, classic Nano</p></div>
-  <div class="btns"><button class="btn quiet sample-trigger" type="button">${sym('i-flask')}Try a sample circuit</button><button class="btn pri lg upload-trigger" type="button">Choose .net file <span class="kbd">${openShortcut}</span></button></div>
+  <div class="btns"><button class="btn pri lg upload-trigger" type="button">Choose .net file <span class="kbd">${openShortcut}</span></button></div>
 </section>
 <footer class="pfoot">
   <div class="brand sm">${sym('cd-logo')}CircuitDoctor<small>hackathon build · 2026</small></div>
   <nav aria-label="Footer"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a></nav>
-  <div class="pow">Powered by <b>FalkorDB graph</b><br>Connections from your file. No circuit simulation.</div>
+  <div class="pow">Connections from your file. No circuit simulation.</div>
 </footer>`;
 }
 
@@ -215,7 +203,7 @@ export function dropHtml(state: DropState) {
       <ellipse cx="22" cy="12" rx="15" ry="5.5" fill="#F6F4EF" stroke="#1D1C1A"/><path d="M7 12v26c0 3 6.7 5.5 15 5.5s15-2.5 15-5.5V12" stroke="#1D1C1A"/>
       <path d="M7 25c0 3 6.7 5.5 15 5.5s15-2.5 15-5.5" stroke="#1D1C1A"/><circle cx="35" cy="41" r="8" fill="#C98410" stroke="#F6F4EF" stroke-width="2.5"/>
       <path d="M35 37v4.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="35" cy="44.6" r="1.1" fill="#fff" stroke="none"/></svg>
-    <div class="t" role="status"><h3>${state.server ? 'Can’t reach the CircuitDoctor server.' : 'Can’t reach the database.'}</h3><p>Start it with <code>docker compose up</code>, then refresh.</p></div>
+    <div class="t" role="status"><h3>CircuitDoctor is temporarily unavailable.</h3><p>Please try again shortly.</p></div>
     ${choose('Choose .net file', true, true)}`;
   return `${netDoc}<div class="t"><h3>Drop your KiCad .net file to test it</h3><p>KiCad netlist · .net · up to 10 MiB · Arduino Uno R3, classic Nano</p></div>${choose()}`;
 }
@@ -252,7 +240,7 @@ export function helpDialogHtml() {
   </svg></div>
   <p class="note"><svg class="no" viewBox="0 0 18 18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7.2"/><path d="M4 14 14 4"/></svg>
     <span>We don’t accept <code>.kicad_sch</code>, <code>.kicad_pcb</code>, images or Gerbers. Only the <code>.net</code> file.</span></p>
-  <div class="mf"><button class="btn sample-trigger" type="button">${sym('i-flask')}Try a sample instead</button><button class="btn pri" id="got-it" type="button" style="padding:0 24px">Got it</button></div>
+  <div class="mf"><button class="btn pri" id="got-it" type="button" style="padding:0 24px">Got it</button></div>
 </dialog>`;
 }
 

@@ -81,7 +81,7 @@ function extraDetails(result: Review) {
     ...(result.voltage?.checks || []).map(part => `<p><strong>${esc(part.ref)}${part.pin ? ` · Pin ${esc(part.pin)}` : ''} supply:</strong> ${part.status === 'unverified' ? `Not verified. ${esc(part.reason)}` : `${esc(part.nominal_voltage)}V nominal, ${part.status === 'within_range' ? 'within' : 'outside'} the ${esc(part.operating_range?.min)}–${esc(part.operating_range?.max)}V operating range.`}</p>${sourceLinks(part.sources)}`),
     ...(result.i2c?.checks || []).filter(pin => pin.status === 'connected' || pin.status === 'unverified').map(pin => `<p>${esc(pin.message)}</p>`),
     result.i2c?.checks.length ? `<p>${esc(result.i2c.scope)}</p>${sourceLinks([...new Map(result.i2c.checks.flatMap(pin => pin.sources).map(source => [source.url, source])).values()])}` : '',
-    result.isolation ? `<p>${result.isolation.group_count} connected group${result.isolation.group_count === 1 ? '' : 's'} of parts (FalkorDB ${esc(result.isolation.algorithm)}). Grouping shows which parts share wiring; it does not prove electrical operation.</p>` : '',
+    result.isolation ? `<p>${result.isolation.group_count} connected group${result.isolation.group_count === 1 ? '' : 's'} of parts. Grouping shows which parts share wiring; it does not prove electrical operation.</p>` : '',
     `<p>${result.summary.marked_unused_pins} pins marked intentionally unused in the file.</p>`,
     result.voltage?.unknown_components.length ? `<p>Supply voltage not verified for: ${esc(result.voltage.unknown_components.join(', '))}.</p>` : '',
   ].filter(Boolean).join('');
@@ -93,7 +93,7 @@ function checksRow(result: Review, passedOnly: boolean) {
   const label = passedOnly ? `${passed} other check${passed === 1 ? '' : 's'} passed` : `${passed} check${passed === 1 ? '' : 's'} passed`;
   const meta = passedOnly ? '' : lines.filter(l => l.status === 'passed').map(l => l.label.toLowerCase()).join(', ');
   return detailsRow(ok, label, meta.length > 30 ? `${esc(meta.slice(0, 28))}…` : esc(meta),
-    `<ul class="checklist">${lines.map(line => `<li class="${line.status}">${line.status === 'passed' ? ok : '<span class="note-dot" aria-hidden="true"></span>'}${esc(line.label)}${line.status === 'note' ? '<span class="meta">see notes</span>' : ''}</li>`).join('')}</ul>
+    `<ul class="checklist">${lines.map(line => `<li class="${line.status}">${line.status === 'passed' ? ok : '<span class="note-dot" aria-hidden="true"></span>'}${esc(line.label)}${line.status === 'note' ? '<span class="meta">see notes</span>' : line.status === 'unverified' ? '<span class="meta">not verified</span>' : ''}</li>`).join('')}</ul>
      <details class="sub"><summary>How these checks work</summary>${extraDetails(result)}</details>`, 'checks-row');
 }
 
@@ -141,8 +141,8 @@ export function reviewPanelHtml(state: ReviewState, ctx: PanelContext) {
         : problemBody(open, ctx.circuit)}
       <div class="rows">
         ${pathPins > 1 ? detailsRow('<span class="minipath" aria-hidden="true"><i></i><b></b><i></i><b></b><i></i></span>', 'See the full path', `${pathPins} pins`, fullPath(open, ctx.circuit), 'path-row') : ''}
-        ${checksRow(result, true)}
-        ${notesRow(allNotes, ctx.circuit)}
+        ${checksRow(result, false)}
+        ${notesRow(allNotes, ctx.circuit)}${cannotRow(result)}
       </div>
       ${tiny({ ...ctx, checkedAt: null })}
     </div>`;
@@ -167,7 +167,7 @@ export function reviewPanelHtml(state: ReviewState, ctx: PanelContext) {
   return `<div class="prob clean">
       <div class="found top">${ok.replace('ok-dot', 'ok-dot lg')}<h2 class="big">No wiring problems found in this file.</h2></div>
       <p class="cons indent">This checks your file’s wiring, not the physical board.</p>
-      <div class="rows">${checksRow(result, false)}${notesRow(allNotes, ctx.circuit)}</div>
+      <div class="rows">${checksRow(result, false)}${notesRow(allNotes, ctx.circuit)}${cannotRow(result)}</div>
       <div class="acts-row"><button class="btn" type="button" data-open-trace>${sym('i-trace')}Trace a connection</button></div>
       ${tiny(ctx)}</div>`;
 }

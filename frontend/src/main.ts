@@ -126,7 +126,7 @@ $("#app").innerHTML = `
     </section>
   </section>
 </main>
-<footer class="statusbar"><div id="meter"></div><div class="st"><span id="db-status"><i class="live wait"></i>FalkorDB…</span><span class="d">·</span><span>Connections from your file. No circuit simulation.</span></div></footer>
+<footer class="statusbar"><div id="meter"></div><div class="st"><span id="db-status"><i class="live wait"></i>Connecting…</span><span class="d">·</span><span>Connections from your file. No circuit simulation.</span></div></footer>
 <div class="drop-overlay" id="drop-overlay" hidden>${icon("upload", 32)}<strong>Drop your .net file</strong></div>
 ${helpDialogHtml()}`;
 
@@ -136,7 +136,13 @@ function showEvidence(evidence: Explanation["evidence"] | null, reveal = false, 
   chatEvidence = evidence ? { evidence } : null;
   evidenceLabel = label;
   evidenceKind = evidence ? kind : "";
-  if (!evidence) { renderInspector(); return; }
+  if (!evidence) {
+    selection = null;
+    graph?.select(null);
+    graph?.clearFocus();
+    renderInspector();
+    return;
+  }
   view = "graph";
   query = "";
   $("#search").setAttribute("value", "");
@@ -217,6 +223,7 @@ function openTrace() {
 function closeTrace() {
   if (!traceOpen()) return;
   $("#circuit-section").classList.remove("trace-open");
+  pathPanel.clearRoute();
   traceRoute = null;
   meterOverride = null;
   const first = review.status === "success" ? groupFindings(review.result).problems[0] : null;
@@ -228,14 +235,14 @@ function closeTrace() {
 function connectionState(online: boolean) {
   const element = $("#connection-status");
   element.classList.toggle("offline", !online);
-  element.innerHTML = `<i class="live"></i>Graph DB ${online ? "connected" : "offline"}`;
+  element.innerHTML = `<i class="live"></i>${online ? "Ready" : "Unavailable"}`;
   $("#db-status").classList.toggle("offline", !online);
   $("#landing-status").classList.toggle("offline", !online);
   $("#landing-status").innerHTML = element.innerHTML;
   serviceOnline = online;
   if (!online) { setDrop({ kind: "offline", server: !apiReachable }); scheduleStatusCheck(); }
   else if (dropState.kind === "offline") setDrop({ kind: "ready" });
-  $("#db-status").innerHTML = `<i class="live"></i>FalkorDB ${online ? "connected" : "offline"}`;
+  $("#db-status").innerHTML = `<i class="live"></i>${online ? "Ready" : "Unavailable"}`;
 }
 let serviceOnline = true;
 let apiReachable = true;
@@ -245,7 +252,6 @@ function setDrop(state: DropState) {
   const zone = $("#dropzone");
   zone.className = `drop dropzone${state.kind === "error" ? " err" : state.kind === "offline" ? " off" : ""}`;
   zone.innerHTML = dropHtml(state);
-  document.querySelectorAll<HTMLButtonElement>(".sample-trigger").forEach(b => { b.disabled = state.kind === "offline"; });
 }
 let statusTimer = 0;
 // While the service is down, look again every few seconds so the page recovers on its own.
@@ -777,10 +783,6 @@ document.addEventListener("click", (event) => {
   if (target.closest("#more-button")) setMenu(menu.hidden !== false);
   else if (!menu.hidden && (!target.closest("#more-list") || target.closest("button"))) setMenu(false);
   if (target.closest(".upload-trigger:not(:disabled)")) $("#file-input").click();
-  if (target.closest(".sample-trigger:not(:disabled)")) {
-    $<HTMLDialogElement>("#help-dialog").close();
-    void readCircuit("/api/samples/uno_short", "uno_short.net", { method: "POST" });
-  }
   if (target.closest("#cancel-load")) cancelLoad();
   if (target.closest(".help-trigger"))
     $<HTMLDialogElement>("#help-dialog").showModal();

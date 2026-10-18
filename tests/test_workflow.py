@@ -3,7 +3,6 @@
 Fixtures use official Uno R3/classic Nano symbols, arbitrary references and
 neutral net labels. A7 5V -> R12 -> J9 is normal; *_short also joins board GND
 to that supply net. J9 is an unspecified external load, not a known device.
-A copy of uno_short.net is the app's one bundled sample (circuitdoctor/samples).
 Run with CIRCUITDOCTOR_TEST_DB=1 python -m unittest discover -s tests -q.
 """
 import os
@@ -24,19 +23,6 @@ def reply(parts):
 
 @unittest.skipUnless(os.environ.get('CIRCUITDOCTOR_TEST_DB') == '1', 'requires local FalkorDB')
 class UploadedCircuitWorkflowTests(unittest.TestCase):
-    def test_bundled_sample_is_stored_and_reviewed_like_an_upload(self):
-        store = get_store()
-        with patch('circuitdoctor.api.migrate_saved_paths'), TestClient(app) as client:
-            response = client.post('/api/samples/uno_short')
-            self.assertEqual(response.status_code, 201, response.text)
-            receipt = response.json()
-            self.addCleanup(store.db.select_graph(receipt['graph_name']).delete)
-            route = f"/api/circuits/{receipt['circuit_id']}"
-            stored = client.get(route).json()['storage']
-            self.assertEqual((stored['source'], stored['filename']), ('falkordb', 'uno_short.net'))
-            review = client.post(route + '/review').json()
-            self.assertEqual([f['rule'] for f in review['findings']], ['power_ground_short'])
-
     def test_kicad_uno_and_nano_normal_and_short_circuits(self):
         store = get_store()
         with patch('circuitdoctor.api.migrate_saved_paths'), TestClient(app) as client:

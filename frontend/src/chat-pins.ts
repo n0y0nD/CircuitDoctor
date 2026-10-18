@@ -22,6 +22,7 @@ export function evidencePinIds(items: ChatEvidence[]) {
 
 export function pinLabels(circuit: Circuit, ids: string[]) {
   const byLabel = new Map<string, string[]>();
+  const componentRefs = new Set(circuit.components.map(c => c.ref.toLowerCase()));
   for (const id of ids) {
     try {
       const [ref, pin] = JSON.parse(id.slice(2)) as [string, string];
@@ -29,9 +30,12 @@ export function pinLabels(circuit: Circuit, ids: string[]) {
         || { ref, pin, pinfunction: 'unknown', pintype: 'unknown' };
       const label = pinName(circuit, node).replace(/^\+/, '');
       // Skip names that would match ordinary words or numbers in a sentence.
-      if (label.length < 2 || /^\d+$/.test(label) || /^pin\b/i.test(label) || label === '~') continue;
+      if (componentRefs.has(label.toLowerCase()) || label.length < 2 || /^\d+$/.test(label) || /^pin\b/i.test(label) || label === '~') continue;
       byLabel.set(label, [...(byLabel.get(label) || []), id]);
     } catch { /* not a pin id */ }
+  }
+  for (const [label, pins] of byLabel) {
+    if (new Set(pins.map(id => JSON.parse(id.slice(2))[0])).size > 1) byLabel.delete(label);
   }
   return byLabel;
 }

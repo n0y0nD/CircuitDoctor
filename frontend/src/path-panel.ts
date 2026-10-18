@@ -54,6 +54,13 @@ export class PathPanel {
         this.onEvidence(this.result.evidence, true);
     });
   }
+  clearRoute() {
+    this.request.cancel();
+    this.result = null;
+    this.renderState({ status: 'idle' });
+    this.onRoute(null);
+    this.onEvidence(null);
+  }
   /** Pre-select pins, e.g. the two ends of a fault, without running the trace. */
   preset(from?: { ref: string; pin: string }, to?: { ref: string; pin: string }) {
     const select = (name: string, value?: { ref: string; pin: string }) => {

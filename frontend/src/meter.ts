@@ -1,5 +1,5 @@
 import type { ReviewState } from './review.ts';
-import { boardRecognized, faultLabel, groupFindings } from './findings.ts';
+import { boardRecognized, checkLines, faultLabel, groupFindings } from './findings.ts';
 import { escapeHtml as esc } from './types.ts';
 
 // The meter never shows a measured value. It reports words, like a real
@@ -22,6 +22,7 @@ export function reviewReading(state: ReviewState): Reading | null {
   }
   if (!boardRecognized(review)) return { flag: 'INFO', text: 'board not recognized' };
   if (review.status === 'incomplete') return { flag: 'INFO', text: 'not enough information' };
+  if (checkLines(review).some(line => line.status === 'unverified')) return { flag: 'INFO', text: 'some connections unverified' };
   return { flag: 'PASS', text: 'no wiring problems' };
 }
 

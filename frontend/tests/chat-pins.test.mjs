@@ -30,3 +30,16 @@ test('names inside other words, tags or escaped text are left alone', () => {
   assert.equal(linkPins('<p>a&lt;b</p>', new Map([['lt', ['p:z']]])), '<p>a&lt;b</p>');
   assert.equal(basedOn([item('find_path', []), item('check_rules', []), item('find_path', [])]), 'path trace · wiring check');
 });
+
+test('component references and shared names are not guessed to be one pin', () => {
+  const c = {
+    components: [{ ref: 'A1', libsource: { lib: 'x', part: 'board' } }, { ref: 'U2', libsource: { lib: 'x', part: 'sensor' } }],
+    libparts: [{ lib: 'x', part: 'board', pins: [{ num: '10', name: 'A1' }, { num: '6', name: 'GND' }, { num: '13', name: 'SDA/A4' }] },
+      { lib: 'x', part: 'sensor', pins: [{ num: '1', name: 'GND' }] }], nets: [],
+  };
+  const ids = [pin('A1', '10'), pin('A1', '6'), pin('U2', '1'), pin('A1', '13')].map(p => p.id);
+  const labels = pinLabels(c, ids);
+  const html = linkPins(formatChatAnswer('Arduino (A1), GND and SDA/A4.'), labels);
+  assert.doesNotMatch(html, /data-chip="(?:A1|GND)"/);
+  assert.match(html, /data-chip="SDA\/A4"/);
+});

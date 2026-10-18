@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from .parser import MAX_FILE_BYTES, NetlistParseError, load_netlist, parse_netlist
+from .parser import MAX_FILE_BYTES, NetlistParseError, parse_netlist
 from .storage import AmbiguousConnection, ConnectionNotFound, CircuitNotFound, StorageUnavailable, get_store
 from .tools import explain_net
 from .review import check_rules
@@ -22,8 +22,7 @@ from .paths import find_path
 from .chat import ask_circuit, chat_status, ChatError, CHAT_LOCK
 
 ROOT = Path(__file__).resolve().parents[1]
-# One bundled demo netlist for "Try a sample circuit": an Uno R3 whose 5V shares a wire with GND.
-SAMPLE_NETLIST = Path(__file__).resolve().parent / "samples" / "uno_short.net"
+
 
 
 def migrate_saved_paths():
@@ -90,13 +89,6 @@ async def upload_circuit(request: Request):
     circuit = await read_upload(request)
     filename = request.query_params.get("filename", "circuit.net")[:255] or "circuit.net"
     return await run_in_threadpool(get_store().save, circuit, filename=filename)
-
-
-@app.post("/api/samples/uno_short", status_code=201)
-def store_sample():
-    # Same receipt as an upload, so the browser follows the identical flow.
-    circuit = load_netlist(SAMPLE_NETLIST)
-    return get_store().save(circuit, filename=SAMPLE_NETLIST.name)
 
 
 @app.get("/api/circuits/{circuit_id}")

@@ -79,3 +79,31 @@ test('the meter shows words, never a measured value', () => {
   assert.equal(reviewReading({ status: 'idle' }), null);
   assert.match(meterHtml(traceReading(2, '5V', 'R12·1')), /TRACE.*2 steps.*5V → R12·1/);
 });
+
+test('unverified and partially covered checks are never counted as passed', () => {
+  const r = review([], {
+    requirements: { recognized_parts: [], checked_pins: 2, connected_pins: 1, missing_pins: 0, unverified_pins: [{ ref: 'U1', pin: '2' }], skipped_pins: [] },
+    voltage: { checked_parts: 1, unverified_parts: 1, checks: [{ status: 'within_range' }, { status: 'unverified' }] },
+    i2c: { checked_pins: 2, unverified_pins: 1, checks: [{ status: 'connected' }, { status: 'unverified' }] },
+  });
+  assert.deepEqual(checkLines(r).slice(2, 5).map(l => l.status), ['unverified', 'unverified', 'unverified']);
+  assert.equal(reviewReading({ status: 'success', result: r }).flag, 'INFO');
+  r.findings = [{ ...short, rule: 'required_power_unconnected' }];
+  assert.equal(checkLines(r)[2].status, 'problem', 'a known warning takes priority over incomplete coverage');
+});
+
+test('zero checked rail nets and conflicting pin metadata do not pass', () => {
+  for (const extra of [{ checked_nets: 0 }, { conflicting_pin_metadata: [{ ref: 'A7', pin: '5' }] }]) {
+    const r = review([], { electrical: { ...review([]).electrical, ...extra } });
+    assert.deepEqual(checkLines(r).slice(0, 2).map(l => l.status), ['unverified', 'unverified']);
+  }
+});
+
+test('fully verified display connections still pass', () => {
+  const r = review([], {
+    requirements: { recognized_parts: [], checked_pins: 2, connected_pins: 2, unverified_pins: [], skipped_pins: [] },
+    voltage: { checked_parts: 1, unverified_parts: 0, checks: [{ status: 'within_range' }] },
+    i2c: { checked_pins: 2, unverified_pins: 0, checks: [{ status: 'connected' }, { status: 'connected' }] },
+  });
+  assert.ok(checkLines(r).every(l => l.status === 'passed'));
+});

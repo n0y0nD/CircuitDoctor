@@ -46,7 +46,7 @@ export function faultLabel(finding: Finding): string | null {
 
 export const isUnconnectedNote = (f: Finding) => f.rule === 'single_pin_net' || f.rule === 'unassigned_pin';
 
-export interface CheckLine { label: string; status: 'passed' | 'problem' | 'note' }
+export interface CheckLine { label: string; status: 'passed' | 'problem' | 'note' | 'unverified' }
 
 /** Checks that actually ran for this file, derived from the review's own coverage. */
 export function checkLines(review: Review): CheckLine[] {
@@ -54,13 +54,25 @@ export function checkLines(review: Review): CheckLine[] {
   const line = (label: string, test: (f: Finding) => boolean, note = false): CheckLine =>
     ({ label, status: has(test) ? (note ? 'note' : 'problem') : 'passed' });
   const lines: CheckLine[] = [];
+  const covered = (label: string, test: (f: Finding) => boolean, verified: boolean): CheckLine =>
+    ({ label, status: has(test) ? 'problem' : verified ? 'passed' : 'unverified' });
   if (review.electrical.recognized_parts.length) {
-    lines.push(line('Power shorted to ground', f => f.rule === 'power_ground_short'));
-    lines.push(line('Two different voltages joined', f => f.rule === 'voltage_rail_conflict'));
+    const verified = review.electrical.checked_nets > 0 && !review.electrical.conflicting_pin_metadata.length;
+    lines.push(covered('Power shorted to ground', f => f.rule === 'power_ground_short', verified));
+    lines.push(covered('Two different voltages joined', f => f.rule === 'voltage_rail_conflict', verified));
   }
-  if (review.requirements?.checked_pins) lines.push(line('Display power pins connected', f => f.rule.startsWith('required_')));
-  if (review.voltage?.checked_parts) lines.push(line('Display supply voltage', f => f.rule === 'supply_voltage_mismatch'));
-  if (review.i2c?.checked_pins) lines.push(line('I2C SDA / SCL wiring', f => f.rule.startsWith('i2c_') && f.rule !== 'i2c_pullup_check'));
+  const required = review.requirements;
+  if (required && (required.checked_pins || required.skipped_pins.length))
+    lines.push(covered('Display power pins connected', f => f.rule.startsWith('required_'),
+      required.checked_pins > 0 && required.connected_pins === required.checked_pins && !required.unverified_pins.length && !required.skipped_pins.length));
+  const voltage = review.voltage;
+  if (voltage && (voltage.checked_parts || voltage.unverified_parts))
+    lines.push(covered('Display supply voltage', f => f.rule === 'supply_voltage_mismatch',
+      voltage.checked_parts > 0 && !voltage.unverified_parts && voltage.checks.every(c => c.status === 'within_range')));
+  const i2c = review.i2c;
+  if (i2c && (i2c.checked_pins || i2c.unverified_pins))
+    lines.push(covered('I2C SDA / SCL wiring', f => f.rule.startsWith('i2c_') && f.rule !== 'i2c_pullup_check',
+      i2c.checked_pins > 0 && !i2c.unverified_pins && i2c.checks.length > 0 && i2c.checks.every(c => c.status === 'connected')));
   if (review.isolation) lines.push(line('Parts cut off in separate groups', f => f.rule === 'isolated_group', true));
   return lines;
 }
