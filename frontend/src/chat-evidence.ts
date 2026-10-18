@@ -2,6 +2,7 @@ import type { ChatEvidence } from './chat';
 import { escapeHtml as esc } from './types.ts';
 
 const labels: Record<string, string> = {
+  verify_fix: 'Earlier and updated files',
   circuit_overview: 'Parts and connections',
   check_rules: 'Wiring checks',
   explain_net: 'Connected pins',
@@ -18,7 +19,9 @@ export function renderChatEvidence(items: ChatEvidence[], turn: number): string 
     const allFindings = item.result.findings || [];
     const findings = allFindings.map((finding, index) => ({ finding, index }))
       .filter(({ finding }) => !['single_pin_net', 'unassigned_pin'].includes(finding.rule || ''));
-    const note = item.tool === 'circuit_overview'
+    const note = item.tool === 'verify_fix'
+      ? 'Both files were checked again. Use the comparison panel to see the old and updated wiring.'
+      : item.tool === 'circuit_overview'
       ? 'Parts and pin connections from your uploaded file.'
       : item.tool === 'check_rules' && !findings.length
         ? allFindings.length ? 'Unconnected pins are listed under Check your connections.' : 'No findings were reported by the available wiring checks.'

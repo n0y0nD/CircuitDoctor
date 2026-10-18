@@ -36,3 +36,16 @@ test('history is bounded and clear-chat ignores even an uncancellable completion
   request.cancel(); finish(response(result('current'))); await running;
   assert.deepEqual(states.map(s=>s.status),['loading']);
 });
+
+test('comparison sends only selected IDs and rejects a mismatched revision pair',async t=>{
+ const pair={original_id:'earlier',corrected_id:'updated'};
+ let sent;
+ const replies=[{...result('earlier'),comparison:pair},{...result('earlier'),comparison:{...pair,corrected_id:'other'}}];
+ t.mock.method(globalThis,'fetch',async (_url,opts)=>{sent=JSON.parse(opts.body);return response(replies.shift());});
+ const states=[];const request=new ChatRequest();
+ await request.run('earlier','What changed?',[],s=>states.push(s),pair);
+ assert.deepEqual(sent.comparison,pair);
+ assert.equal(states.at(-1).status,'success');
+ await request.run('earlier','What changed?',[],s=>states.push(s),pair);
+ assert.equal(states.at(-1).status,'error');
+});

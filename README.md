@@ -90,6 +90,14 @@ the host port in `compose.yaml`. Website: 8080; database: 6379; database viewer:
   Corrected uploads are checked independently. Supply-voltage review compares the ER-OLEDM0.91-1 I2C OLED’s documented 3–5V operating range against direct nominal Uno/Nano rails with a common board ground reference. It does not propagate voltage through parts. LCD-016N002L remains unverified because its symbol does not identify the 3V/5V variant. Unknown supplies, conflicting metadata and unknown parts stay unverified; an in-range nominal supply does not prove operation or signal compatibility.
 - Direct power tracing shows pins sharing a known board rail. It stops at parts;
   it does not treat a resistor or common ground as a proven power dependency.
+- **Check an updated file:** use the small action beside **Check connections**,
+  then choose **Choose updated .net file** to compare a corrected export. Both uploads are reviewed from FalkorDB;
+  results separate resolved, persistent, new and unverified warnings, with before/after
+  wiring highlights. Connection groups are matched by component references and pin IDs,
+  so net renaming alone is not a wiring edit. Removed/renamed components, changed part
+  identities or lost pin metadata prevent a confirmed repair verdict. Required supply,
+  voltage and I2C fixes need a positive supported recheck, not just an absent warning.
+  This checks supported warnings only; it does not prove hardware operation.
 - **Trace a connection:** choose any two exported pins in your uploaded circuit.
   FalkorDB computes a bounded `shortestPath` over `ON_NET` and derived resistor
   `THROUGH` edges. The UI lists the steps and highlights only route memberships.

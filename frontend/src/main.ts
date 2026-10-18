@@ -1,6 +1,9 @@
 import "@fontsource-variable/inter";
 import "./style.css";
+import { VerifyPanel } from "./verify-panel";
+import { comparisonFromHash, circuitHash } from "./verify-fix";
 import { PathPanel } from "./path-panel";
+import type { ChatComparison } from "./chat";
 import { ChatPanel } from "./chat-panel";
 import type { Explanation } from "./explanation";
 import { renderConnectionExplanation } from "./connection-explanation";
@@ -82,9 +85,10 @@ $("#app").innerHTML = `
   <section class="circuit-section" id="circuit-section" aria-label="Your uploaded circuit" hidden>
     <div class="circuit-topline"><div class="circuit-title-group"><span class="file-icon">${icon("file", 23)}</span><div><h1 id="circuit-title"></h1><p id="circuit-summary"></p></div></div><button class="icon-button" id="clear-circuit" aria-label="Close circuit and return to upload" title="Close circuit">${icon("close", 19)}</button></div>
     <section class="review-panel" aria-label="Circuit review">
-      <div class="review-heading"><div><h2>Check your connections</h2><p>See what needs attention, then select it to see the wiring.</p></div><button id="run-review" class="button primary">Run review</button></div>
+      <div class="review-heading"><div><h2>Check your connections</h2><p>See what needs attention, then select it to see the wiring.</p></div><div class="review-actions"><button id="run-review" class="button primary">Run review</button><button id="open-verify" class="text-button" aria-controls="verify-panel" aria-expanded="false">Check an updated file</button></div></div>
       <div id="review-results" aria-live="polite"></div>
     </section>
+    <section id="verify-panel" class="path-panel" aria-label="Check an updated file" hidden></section>
     <section id="path-panel" class="path-panel" aria-label="Connection route" hidden></section>
     <div class="workbench">
       <section class="explorer-panel" aria-label="Circuit explorer">
@@ -126,9 +130,18 @@ function showEvidence(evidence: Explanation["evidence"] | null, reveal = false) 
   renderInspector();
   if (reveal) $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
 }
+let activeComparison: ChatComparison | null = null;
 const chatPanel = new ChatPanel($("#chat-panel"), evidence => {
   showEvidence(evidence);
   $(".workbench").scrollIntoView({ block: "start", behavior: "smooth" });
+});
+const verifyPanel = new VerifyPanel($("#verify-panel"), async (id, evidence) => {
+  if (circuit?.storage.circuit_id !== id) await readCircuit(`/api/circuits/${encodeURIComponent(id)}`, "Saved circuit", {}, true);
+  if (circuit?.storage.circuit_id === id) showEvidence(evidence, true);
+}, $("#open-verify"), result => {
+  activeComparison = result ? { original_id: result.original_id, corrected_id: result.corrected_id } : null;
+  chatPanel.setComparison(activeComparison);
+  if (circuit) history.replaceState(null, "", circuitHash(circuit.storage.circuit_id, activeComparison));
 });
 const pathPanel = new PathPanel($("#path-panel"), showEvidence);
 
@@ -152,12 +165,14 @@ async function readCircuit(
   url: string,
   name: string,
   options: RequestInit = {},
+  keepComparison = false,
 ) {
   clearExplanation();
   clearReview();
   renderExplanation();
   chatPanel.setCircuit("");
   pathPanel.setCircuit(null);
+  if (!keepComparison) verifyPanel.setCircuit(null);
   const currentRequest = ++requestId;
   setBusy(true);
   notice();
@@ -189,10 +204,12 @@ async function readCircuit(
     clearExplanation();
     clearReview();
     circuit = result;
+    if (!keepComparison) verifyPanel.setCircuit(result);
     chatPanel.setCircuit(result.storage.circuit_id);
+    chatPanel.setComparison(activeComparison);
     pathPanel.setCircuit(result);
     filename = result.storage.filename || name;
-    history.replaceState(null, "", `#circuit=${result.storage.circuit_id}`);
+    history.replaceState(null, "", circuitHash(result.storage.circuit_id, activeComparison));
     view = "graph";
     showUnused = false;
     $<HTMLInputElement>("#unused-toggle").checked = false;
@@ -211,7 +228,8 @@ async function readCircuit(
     notice(
       `${message}${circuit ? " Your previous circuit is still displayed." : ""}`,
     );
-    if (circuit) { chatPanel.setCircuit(circuit.storage.circuit_id); pathPanel.setCircuit(circuit); }
+    if (circuit && !keepComparison) verifyPanel.setCircuit(circuit);
+    if (circuit) { chatPanel.setCircuit(circuit.storage.circuit_id); chatPanel.setComparison(activeComparison); pathPanel.setCircuit(circuit); }
     if (error instanceof TypeError) connectionState(false);
   } finally {
     if (currentRequest === requestId) setBusy(false);
@@ -547,6 +565,7 @@ document.addEventListener("keydown", event => {
   if (event.key === "Escape") setExpanded(false);
 });
 $("#clear-circuit").onclick = () => {
+  verifyPanel.setCircuit(null);
   setExpanded(false);
   chatPanel.setCircuit("");
   pathPanel.setCircuit(null);
@@ -572,7 +591,23 @@ $<HTMLDialogElement>("#help-dialog").addEventListener("click", (event) => {
 fetch("/api/status")
   .then(async (response) => connectionState(response.ok && (await response.json()).graph_storage === "connected"))
   .catch(() => connectionState(false));
+const savedComparison = comparisonFromHash(location.hash);
 const savedId = new URLSearchParams(location.hash.slice(1)).get("circuit");
 if (savedId && /^[0-9a-f]{32}$/.test(savedId)) {
-  void readCircuit(`/api/circuits/${savedId}`, "Stored circuit");
+  const loading = readCircuit(`/api/circuits/${savedId}`, "Stored circuit");
+  const loadingVersion = requestId;
+  void loading.then(async () => {
+    if (!savedComparison || requestId !== loadingVersion || circuit?.storage.circuit_id !== savedId) return;
+    try {
+      const response = await fetch(`/api/circuits/${savedComparison.original_id}`);
+      if (!response.ok) throw new Error('The earlier file could not be loaded.');
+      const original = await response.json() as Circuit;
+      if (requestId !== loadingVersion) return;
+      if (original.storage?.source !== 'falkordb' || original.storage.circuit_id !== savedComparison.original_id)
+        throw new Error('The earlier file could not be verified.');
+      await verifyPanel.restore(original, savedComparison.corrected_id);
+    } catch {
+      if (requestId === loadingVersion) notice('Could not restore the comparison. Use “Check an updated file” to try again.');
+    }
+  });
 }

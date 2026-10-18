@@ -1,6 +1,6 @@
 import { renderChatEvidence } from './chat-evidence';
 import { formatChatAnswer } from './chat-format';
-import { ChatRequest, type ChatMessage, type ChatResult } from './chat';
+import { ChatRequest, type ChatComparison, type ChatMessage, type ChatResult } from './chat';
 import { escapeHtml as esc } from './types';
 import type { Explanation } from './explanation';
 
@@ -8,6 +8,7 @@ type Turn = { question: string; response: ChatResult };
 export class ChatPanel {
   private request = new ChatRequest();
   private circuitId = '';
+  private comparison: ChatComparison | null = null;
   private version = 0;
   private turns: Turn[] = [];
   private busy = false;
@@ -38,7 +39,15 @@ export class ChatPanel {
     });
     this.render();
   }
+  setComparison(comparison: ChatComparison | null) {
+    const next = comparison && [comparison.original_id, comparison.corrected_id].includes(this.circuitId) ? comparison : null;
+    if (JSON.stringify(next) === JSON.stringify(this.comparison)) return;
+    this.request.cancel(); this.comparison = next;
+    this.turns = []; this.busy = false; this.error = '';
+    this.render();
+  }
   setCircuit(id: string) {
+    this.comparison = null;
     this.version++; this.request.cancel(); this.circuitId = id;
     this.turns = []; this.draft = ''; this.error = ''; this.busy = false;
     this.configured = false; this.statusError = ''; this.checking = false;
@@ -75,13 +84,13 @@ export class ChatPanel {
       if (state.status === 'error') this.error = state.message;
       this.render();
       if (state.status !== 'loading') this.root.querySelector<HTMLTextAreaElement>('textarea')?.focus();
-    });
+    }, this.comparison);
   }
   private render() {
     this.root.hidden = !this.circuitId;
     const disabled = this.busy || !this.configured || this.checking;
     this.root.innerHTML = `<div class="chat-heading"><div><h2>Ask about your circuit</h2><p>Understand your circuit, one connection at a time.</p></div>${this.turns.length || this.busy ? '<button type="button" class="text-button" data-chat-clear>Clear chat</button>' : ''}</div>
-      <p class="chat-intro">Ask how parts connect, explore a pin, or find out where to start checking.</p>
+      <p class="chat-intro">${this.comparison ? `Comparing your earlier and updated files. Viewing the ${this.circuitId === this.comparison.original_id ? 'earlier' : 'updated'} circuit. Ask “What changed?” or “Is the fix complete?”` : 'Ask how parts connect, explore a pin, or find out where to start checking.'}</p>
       ${!this.configured ? `<p class="chat-setup" role="status">${this.checking ? 'Checking Gemini setup…' : esc(this.statusError || 'Save your Gemini API key locally to enable chat.')} ${!this.checking ? '<button type="button" class="text-button" data-chat-recheck>Check again</button>' : ''}</p>` : ''}
       <div class="chat-turns" aria-live="polite" aria-relevant="additions text">${this.turns.map((turn, index) => `<article class="chat-turn"><p class="chat-question"><strong>You</strong><span>${esc(turn.question)}</span></p><div class="chat-answer"><strong>CircuitDoctor</strong><div class="chat-answer-body">${formatChatAnswer(turn.response.answer)}</div>
         ${renderChatEvidence(turn.response.evidence, index)}</div></article>`).join('')}</div>

@@ -16,6 +16,7 @@ from .parser import MAX_FILE_BYTES, NetlistParseError, parse_netlist
 from .storage import AmbiguousConnection, ConnectionNotFound, CircuitNotFound, StorageUnavailable, get_store
 from .tools import explain_net
 from .review import check_rules
+from .compare import compare_circuits
 from .power import trace_power
 from .paths import find_path
 from .chat import ask_circuit, chat_status, ChatError, CHAT_LOCK
@@ -94,6 +95,16 @@ def stored_circuit(circuit_id: str):
     return get_store().read(circuit_id)
 
 
+class CompareRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    corrected_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+
+
+@app.post("/api/circuits/{circuit_id}/compare")
+def verify_fix(circuit_id: str, body: CompareRequest):
+    return compare_circuits(get_store(), circuit_id, body.corrected_id)
+
+
 class ExplainRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     net_code: str | None = Field(default=None, min_length=1)
@@ -160,8 +171,15 @@ class ChatMessage(BaseModel):
     content: str = Field(min_length=1, max_length=12000)
 
 
+class ChatComparison(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    original_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    corrected_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+
+
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    comparison: ChatComparison | None = None
     message: str = Field(min_length=1, max_length=2000)
     history: list[ChatMessage] = Field(default_factory=list, max_length=8)
 
@@ -187,7 +205,7 @@ def chat(circuit_id: str, body: ChatRequest):
     if not CHAT_LOCK.acquire(blocking=False):
         raise HTTPException(429, "A chat request is already running. Please wait for it to finish.")
     try:
-        return ask_circuit(get_store(), circuit_id, body.message.strip(), [m.model_dump() for m in body.history])
+        return ask_circuit(get_store(), circuit_id, body.message.strip(), [m.model_dump() for m in body.history], comparison=body.comparison.model_dump() if body.comparison else None)
     except ChatError as exc:
         raise HTTPException(exc.status, str(exc)) from None
     finally:
