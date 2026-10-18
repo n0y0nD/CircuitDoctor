@@ -12,11 +12,12 @@ import type { Explanation } from "./explanation";
 import { renderConnectionExplanation } from "./connection-explanation";
 import { icon, sym } from "./icons";
 import { dropHtml, helpDialogHtml, landingHtml, loadingHtml, loadingSteps, type DropState, type LoadStep } from "./landing";
-import { CircuitGraph } from "./graph";
+import { CircuitGraph, type ProbeTargets } from "./graph";
+import { graphPinId } from "./graph-focus";
 import { ExplanationRequest, singleEvidencePin, type ExplanationState } from "./explanation";
 import { ReviewRequest, type ReviewState, type Finding } from "./review";
 import { reviewPanelHtml, sourceLinks } from "./review-panel";
-import { boardRecognized, groupFindings } from "./findings";
+import { boardRecognized, faultEnds, groupFindings, pinWord } from "./findings";
 import {
   componentKind,
   boardLabel,
@@ -357,7 +358,7 @@ function renderCircuit() {
   const boards = circuit.components.filter((c) => componentKind(c) === "board");
   const board = boards.length === 1
     ? boardLabel(boards[0])
-    : boards.length > 1 ? `${boards.length} Arduino boards` : "Board not identified";
+    : boards.length > 1 ? `${boards.length} Arduino boards` : "Board not recognized";
   $("#topbar-filename").textContent = filename;
   $("#topbar-board").textContent = `${board} · ${circuit.components.length} component${circuit.components.length === 1 ? "" : "s"}`;
   $("#topbar-file").hidden = false;
@@ -409,11 +410,31 @@ function renderView() {
     );
     graph.select(selection);
     graph.search(query);
-    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null), selectedFinding ? "issue" : "route");
+    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null), selectedFinding ? "issue" : "route", focusLabel());
+    graph.setProbes(probeTargets());
   } else renderList();
   const shown = visibleNets(circuit, showUnused, selection).length;
   $("#graph-summary").textContent =
     `${circuit.components.length} components · ${shown} connections in view`;
+}
+function focusLabel() {
+  if (!selectedFinding || review.status !== "success") return "";
+  const problems = groupFindings(review.result).problems;
+  const n = problems.indexOf(selectedFinding);
+  return n >= 0 ? `Showing · problem ${n + 1} in red` : `Showing · ${selectedFinding.title}`;
+}
+// Probes touch the two ends of the shown fault: the first rail pin (red) and the first ground pin (black).
+function probeTargets(): ProbeTargets | null {
+  if (!selectedFinding || review.status !== "success") return null;
+  const problems = groupFindings(review.result).problems;
+  const markers = problems.filter(p => p !== selectedFinding && problems.includes(selectedFinding!)).map(p => ({
+    n: problems.indexOf(p) + 1,
+    ids: p.evidence.nodes.filter(node => node.kind === "pin").map(node => node.id),
+  }));
+  const ends = faultEnds(selectedFinding);
+  const tags = (selectedFinding.specifications || []).filter(spec => spec.role === "rail" || spec.role === "ground")
+    .map(spec => ({ id: graphPinId(spec.ref, spec.pin), text: pinWord(spec), tone: spec.role === "rail" && ends?.[0] === spec ? "red" as const : "ink" as const }));
+  return ends ? { red: graphPinId(ends[0].ref, ends[0].pin), black: graphPinId(ends[1].ref, ends[1].pin), tags, markers } : { markers };
 }
 function renderList() {
   if (!circuit) return;

@@ -6,6 +6,10 @@ import { partDrawing, groundImage, isGroundNet } from './part-art';
 import { evidenceMemberships, type Explanation } from './explanation';
 import { simpleWireRoute } from './wire-routing';
 import { connectionFocus } from './graph-focus';
+import { probesSvg, type ProbeEnd } from './probes';
+
+/** What the probes touch: two pin ids (red first) and numbered markers for other problems. */
+export interface ProbeTargets { red?: string; black?: string; tags?: { id: string; text: string; tone: 'red' | 'ink' }[]; markers?: { n: number; ids: string[] }[] }
 
 type Point = { x: number; y: number };
 // Keep manual arrangements while switching tabs, scoped to each uploaded circuit.
@@ -19,6 +23,8 @@ export class CircuitGraph {
   private initial = new Map<string, Point>();
   private arrangement: Map<string, Point>;
   private focusStatus: HTMLElement;
+  private overlay: SVGSVGElement;
+  private probes: ProbeTargets | null = null;
   constructor(container: HTMLElement, private circuit: Circuit, showUnused: boolean,
     onSelect: (selection: Selection) => void, onZoom: (value: number) => void, selection: Selection | null = null) {
     const key = circuit.storage.circuit_id;
@@ -118,7 +124,8 @@ export class CircuitGraph {
       // A one-pin net is not a connection to ground (or any other part).
       // Its terminal is already present above; do not draw a misleading wire.
       if(net.nodes.length<2) return;
-      const color = ground(net) ? '#697e8c' : ['#b48736','#4f91a3','#8271ab','#5b936e','#b57362','#5781ae'][index%6];
+      // Muted jumper-wire colours; red is reserved for faults.
+      const color = ground(net) ? '#8E9BA6' : ['#B59A6A','#7E8FB0','#8C8AA8','#8E9BA6','#9A8F7E','#7F9A97'][index%6];
       if(net.nodes.length===2) {
         const terminals=net.nodes.map(pin=>{
           const id=pinId(pin.ref,pin.pin), point=ports.get(id)!;
@@ -207,35 +214,47 @@ export class CircuitGraph {
       style:[
         {selector:'node[kind = "component"]',style:{shape:'round-rectangle',width:'data(width)',height:'data(height)',
           'background-image':'data(image)','background-fit':'contain','background-opacity':0,'border-width':0,
-          label:'data(label)','font-size':14,'font-weight':600,color:'#304e45','text-valign':'bottom','text-margin-y':16,
+          label:'data(label)','font-family':'"Bricolage Grotesque Variable", "Bricolage Grotesque", sans-serif','font-size':15,'font-weight':700,color:'#1D1C1A','text-valign':'bottom','text-margin-y':14,
           'text-max-width':'280px','text-wrap':'wrap','overlay-opacity':0,'bounds-expansion':6}},
-        {selector:'node[kind = "pin"]',style:{width:7,height:7,'background-color':'#fbfdfc','border-width':2,'border-color':'#607f72',
-          label:'data(label)','font-size':12,color:'#425e52','text-valign':'top','text-margin-y':-7,'text-background-color':'#fbfdfc',
+        {selector:'node[kind = "pin"]',style:{width:8,height:8,'background-color':'#f5d580','border-width':1.5,'border-color':'#7b6a3e',
+          label:'data(label)','font-family':'"JetBrains Mono Variable", "JetBrains Mono", monospace','font-size':11,color:'#55524C','text-valign':'top','text-margin-y':-7,'text-background-color':'#EFECE5',
           'text-background-opacity':0.94,'text-background-padding':'2px','overlay-opacity':0,'z-index':10}},
-        {selector:'node[board = "yes"]',style:{width:9,height:9,'background-color':'#ffdc7b','border-color':'#fff0bc','border-width':2}},
-        {selector:'node[kind = "bend"]',style:{width:10,height:10,'background-color':'#fcfdfc','border-color':'#168673','border-width':1.5,'overlay-opacity':0,'z-index':10,opacity:0}},
+        {selector:'node[board = "yes"]',style:{width:9,height:9,'background-color':'#eabf57','border-color':'#fff0af','border-width':1.5}},
+        {selector:'node[kind = "bend"]',style:{width:10,height:10,'background-color':'#F6F4EF','border-color':'#55524C','border-width':1.5,'overlay-opacity':0,'z-index':10,opacity:0}},
         {selector:'node[kind = "anchor"]',style:{width:1,height:1,opacity:0,events:'no'}},
         {selector:'node[kind = "net"]',style:{width:6,height:6,'background-color':'data(color)',label:'',
-          'font-size':13,color:'#425e52','text-valign':'top','text-margin-y':-8,'text-background-color':'#fbfdfc',
+          'font-family':'"JetBrains Mono Variable", "JetBrains Mono", monospace','font-size':12,color:'#55524C','text-valign':'top','text-margin-y':-8,'text-background-color':'#EFECE5',
           'text-background-opacity':1,'text-background-padding':'4px','overlay-opacity':0}},
         {selector:'node[ground = "yes"]',style:{width:32,height:28,'background-image':'data(image)','background-fit':'contain','background-opacity':0,'border-width':0}},
-        {selector:'node[single = "yes"]',style:{'background-color':'#d09b40','border-width':2,'border-color':'#b5832d'}},
-        {selector:'edge',style:{width:3,'line-color':'data(color)','curve-style':'taxi','taxi-direction':'auto','taxi-turn':'50%','taxi-turn-min-distance':0,'source-endpoint':'outside-to-node','target-endpoint':'outside-to-node','overlay-opacity':0}},
+        {selector:'node[single = "yes"]',style:{'background-color':'#EFECE5','border-width':1.5,'border-color':'#8A867E'}},
+        {selector:'edge',style:{width:2.5,'line-color':'data(color)','curve-style':'taxi','taxi-direction':'auto','taxi-turn':'50%','taxi-turn-min-distance':0,'source-endpoint':'outside-to-node','target-endpoint':'outside-to-node','overlay-opacity':0}},
         {selector:'edge[kind = "lead"]',style:{'curve-style':'straight',width:2}},
-        {selector:'.active',style:{'border-width':2,'border-color':'#16836b'}},
-        {selector:'.selection-muted',style:{opacity:0.2}},
-        {selector:'node.connected',style:{'border-color':'#168673','border-width':2}},
-        {selector:'edge.connected',style:{width:3.5,'line-color':'#168673','z-index':5}},
+        {selector:'.active',style:{'border-width':2,'border-color':'#1D1C1A'}},
+        {selector:'node[kind = "component"].active',style:{'border-width':0}},
+        {selector:'.selection-muted',style:{opacity:0.22}},
+        {selector:'node.connected',style:{'border-color':'#1D1C1A','border-width':2}},
+        {selector:'node[kind = "component"].connected',style:{'border-width':0}},
+        {selector:'edge.connected',style:{width:3,'line-color':'#1D1C1A','z-index':5}},
         {selector:'node[kind = "bend"].connected',style:{opacity:1}},
         {selector:'node[kind = "net"].active',style:{label:'data(label)'}},
         {selector:'.muted',style:{opacity:0.18}},
-        {selector:'.evidence-muted',style:{opacity:0.16}},
-        {selector:'node.evidence',style:{'border-width':3,'border-color':'#2874db',opacity:1}},
-        {selector:'edge.evidence',style:{width:4,'line-color':'#2874db',opacity:1,'z-index':6}},
-        {selector:'node.issue',style:{'border-width':3,'border-color':'#d38a16',opacity:1}},
-        {selector:'node[kind = "pin"].issue',style:{width:15,height:15,'background-color':'#ffdfa2','border-width':3}},
-        {selector:'edge.issue',style:{'line-color':'#d38a16'}},
-        {selector:'.match',style:{'border-width':3,'border-color':'#16836b',opacity:1}},
+        {selector:'.evidence-muted',style:{opacity:0.22}},
+        // A traced route is dark ink; red is only for faults.
+        {selector:'node.evidence',style:{'border-width':2.5,'border-color':'#1D1C1A',opacity:1}},
+        {selector:'node[kind = "component"].evidence',style:{'border-width':0}},
+        {selector:'node[kind = "net"].evidence',style:{'background-color':'#1D1C1A',width:8,height:8}},
+        {selector:'edge.evidence',style:{width:3.5,'line-color':'#1D1C1A',opacity:1,'z-index':6}},
+        // The faulty net: red, under a soft halo, with junction dots.
+        {selector:'node.issue',style:{'border-color':'#D4362A'}},
+        {selector:'node[kind = "component"].issue',style:{'border-width':0}},
+        {selector:'node[kind = "pin"].issue',style:{width:10,height:10,'background-color':'#f5d580','border-width':2.5,'border-color':'#D4362A'}},
+        {selector:'node[kind = "net"].issue',style:{'background-color':'#D4362A',width:9,height:9,'border-width':0}},
+        {selector:'edge.issue',style:{width:3,'line-color':'#D4362A','underlay-color':'#D4362A','underlay-opacity':0.13,'underlay-padding':6,'z-index':7}},
+        {selector:'node.tagged',style:{label:'data(tag)','font-family':'"JetBrains Mono Variable", "JetBrains Mono", monospace','font-size':12,'font-weight':600,color:'#1D1C1A',
+          'text-background-color':'#F6F4EF','text-background-opacity':1,'text-background-padding':'3px','text-background-shape':'roundrectangle','text-margin-y':-12,'z-index':12}},
+        {selector:'node.tagged.tag-red',style:{color:'#ffffff','text-background-color':'#D4362A'}},
+        {selector:'.match',style:{'border-width':2.5,'border-color':'#1D1C1A',opacity:1}},
+        {selector:'node[kind = "component"].match',style:{'border-width':0}},
       ]});
     this.cy.nodes().forEach(node => { this.initial.set(node.id(), { ...node.position() }); });
     this.cy.nodes('[kind = "pin"], [kind = "anchor"]').ungrabify();
@@ -275,6 +294,11 @@ export class CircuitGraph {
     this.focusStatus.hidden = true;
     this.focusStatus.setAttribute('role','status');
     container.parentElement!.append(this.focusStatus);
+    this.overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    this.overlay.setAttribute('class', 'probe-overlay');
+    this.overlay.setAttribute('aria-hidden', 'true');
+    container.parentElement!.append(this.overlay);
+    this.cy.on('render', () => this.drawProbes());
     this.cy.on('mouseover','node, edge[kind = "wire"]',()=>{container.style.cursor='grab';});
     this.cy.on('mouseout','node, edge',()=>{container.style.cursor='grab';});
     this.cy.on('zoom',()=>onZoom(Math.round(this.cy.zoom()*100)));
@@ -292,6 +316,7 @@ export class CircuitGraph {
     this.fit();
   }
   select(selection:Selection|null) {
+    if(selection) this.setProbes(null);
     this.cy.elements().removeClass('active connected selection-muted');
     this.focusStatus.hidden = !selection;
     if(!selection)return;
@@ -310,12 +335,47 @@ export class CircuitGraph {
     clear.onclick = () => this.clearFocus();
     this.focusStatus.append(clear);
   }
+  /** Put the probes on two pins (red first). Pins not drawn in this view are simply skipped. */
+  setProbes(targets: ProbeTargets | null) {
+    this.probes = targets;
+    this.cy.nodes('.tagged').removeClass('tagged tag-red tag-ink').forEach(node => { node.removeData('tag'); });
+    for (const tag of targets?.tags || []) {
+      const node = this.cy.getElementById(tag.id);
+      if (node.nonempty()) node.data('tag', tag.text).addClass(`tagged tag-${tag.tone}`);
+    }
+    this.drawProbes();
+  }
+  private end(id?: string): ProbeEnd | null {
+    if (!id) return null;
+    const node = this.cy.getElementById(id);
+    if (node.empty() || node.removed()) return null;
+    const part = this.cy.getElementById(`c:${node.data('ref')}`);
+    const fromAbove = part.nonempty() && node.position().y < part.position().y;
+    const at = node.renderedPosition();
+    return { x: at.x, y: at.y, fromAbove };
+  }
+  private drawProbes() {
+    const targets = this.probes;
+    if (!targets) { this.overlay.innerHTML = ''; return; }
+    // Numbered dots for the other problems; neighbouring pins would stack them, so nudge apart.
+    const markers: { n: number; x: number; y: number }[] = [];
+    for (const marker of targets.markers || []) {
+      const node = marker.ids.map(id => this.cy.getElementById(id)).find(n => n.nonempty());
+      if (!node) continue;
+      const at = node.renderedPosition();
+      let x = at.x + 14, y = at.y - 16;
+      while (markers.some(m => Math.hypot(m.x - x, m.y - y) < 24)) x += 26;
+      markers.push({ n: marker.n, x, y });
+    }
+    this.overlay.innerHTML = probesSvg(this.end(targets.red), this.end(targets.black), markers, this.cy.zoom());
+  }
   clearFocus() {
+    this.setProbes(null);
     this.cy.elements().removeClass('active connected selection-muted evidence evidence-muted issue');
     this.focusStatus.hidden = true;
     this.fit();
   }
-  highlightEvidence(result: Pick<Explanation, 'evidence'> | null, mode: 'route' | 'issue' = 'route') {
+  highlightEvidence(result: Pick<Explanation, 'evidence'> | null, mode: 'route' | 'issue' = 'route', label = '') {
     this.cy.elements().removeClass('evidence evidence-muted issue');
     if (!result) return;
     this.cy.elements().removeClass('active connected selection-muted');
@@ -331,7 +391,7 @@ export class CircuitGraph {
     const refs = new Set(this.cy.nodes().filter(n=>ids.has(n.id()) && n.data('kind')==='pin').map(n=>n.data('ref')));
     this.cy.nodes().filter(n=>n.data('kind')==='component' && refs.has(n.data('ref'))).removeClass('evidence-muted');
     if(mode==='issue') this.cy.elements('.evidence').addClass('issue');
-    this.setFocusLabel(mode==='issue' ? 'Possible issue · Highlighted in amber' : 'Connection evidence · Highlighted in blue');
+    this.setFocusLabel(label || (mode==='issue' ? 'Showing · the problem in red' : 'Showing · the route in dark ink'));
     const focus = this.cy.nodes().filter(n=>ids.has(n.id()) || (n.data('kind')==='component' && refs.has(n.data('ref'))));
     if(focus.length) { this.cy.fit(focus,70); if(this.cy.zoom()>1.2) this.cy.zoom(1.2); }
   }
@@ -351,5 +411,5 @@ export class CircuitGraph {
     this.fit();
   }
   fit(){this.cy.resize();this.cy.fit(undefined,35);}
-  destroy(){this.observer.disconnect();this.focusStatus.remove();this.cy.destroy();}
+  destroy(){this.observer.disconnect();this.focusStatus.remove();this.overlay.remove();this.cy.destroy();}
 }

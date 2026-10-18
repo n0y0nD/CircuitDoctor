@@ -4,7 +4,7 @@ import { resistorBody } from './resistor-art.ts';
 import type { BoardDrawing, BoardPort } from './board-art.ts';
 
 const svgImage = (body: string, width: number, height: number) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><g font-family="Arial,sans-serif">${body}</g></svg>`)}`;
-export const groundImage = svgImage('<path d="M16 0v12M3 12h26M7 18h18M12 24h8" fill="none" stroke="#43675a" stroke-width="2.5"/>',32,28);
+export const groundImage = svgImage('<path d="M16 0v12M3 12h26M7 18h18M12 24h8" fill="none" stroke="#8A867E" stroke-width="2.5"/>',32,28);
 export function isGroundNet(circuit: Circuit, net: Net): boolean {
   return /^(GND|GNDA|GNDD|GNDPWR|GROUND)$/i.test(net.name.replace(/^\//,'')) ||
     net.nodes.some(pin => /^(GND|GNDA|GNDD|GNDPWR)$/.test(pinName(circuit,pin)));

@@ -536,3 +536,4 @@ tr:hover { background: var(--paper-2); }
 .verify-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .verify-heading h2 { margin: 0; font-size: 15px; }
 .verify-heading .text-button { font-size: 12px; }
+.probe-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 4; }
