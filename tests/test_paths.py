@@ -240,3 +240,14 @@ class PathStartupTests(unittest.TestCase):
             get_store.return_value.available.return_value = False
             with self.assertLogs('circuitdoctor.api', level='ERROR'), TestClient(app) as client:
                 self.assertEqual(client.get('/api/status').status_code, 200)
+
+
+class LandingQueryTests(unittest.TestCase):
+    def test_landing_page_shows_the_real_trace_query(self):
+        import re
+        from pathlib import Path
+        from circuitdoctor.paths import PATH_QUERY
+        source = (Path(__file__).resolve().parents[1] / 'frontend/src/landing.ts').read_text()
+        block = re.search(r'PATH_QUERY_LINES = \[(.*?)\];', source, re.S).group(1)
+        lines = re.findall(r"'([^']*)'", block)
+        self.assertEqual('\n'.join(lines), PATH_QUERY)

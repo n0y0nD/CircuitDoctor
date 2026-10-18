@@ -60,7 +60,7 @@ export function checkLines(review: Review): CheckLine[] {
   }
   if (review.requirements?.checked_pins) lines.push(line('Display power pins connected', f => f.rule.startsWith('required_')));
   if (review.voltage?.checked_parts) lines.push(line('Display supply voltage', f => f.rule === 'supply_voltage_mismatch'));
-  if (review.i2c?.checked_pins) lines.push(line('I²C SDA / SCL wiring', f => f.rule.startsWith('i2c_') && f.rule !== 'i2c_pullup_check'));
+  if (review.i2c?.checked_pins) lines.push(line('I2C SDA / SCL wiring', f => f.rule.startsWith('i2c_') && f.rule !== 'i2c_pullup_check'));
   if (review.isolation) lines.push(line('Parts cut off in separate groups', f => f.rule === 'isolated_group', true));
   return lines;
 }

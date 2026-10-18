@@ -22,7 +22,7 @@ function bench() {
     <circle cx="556" cy="520" r="17" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="5"/><circle cx="556" cy="520" r="5" fill="#1D1C1A"/>
     <circle cx="884" cy="520" r="17" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="5"/><circle cx="884" cy="520" r="5" fill="#1D1C1A"/>
     <text x="556" y="566" text-anchor="middle" font-size="13" font-weight="600" fill="#1D1C1A">+5V</text>
-    <text x="556" y="583" text-anchor="middle" font-size="11.5" fill="#8A867E">A7 · pin 5V</text>
+    <text x="556" y="583" text-anchor="middle" font-size="11.5" fill="#8A867E">A7 · pin 5</text>
     <text x="884" y="566" text-anchor="middle" font-size="13" font-weight="600" fill="#1D1C1A">GND</text>
     <text x="884" y="583" text-anchor="middle" font-size="11.5" fill="#8A867E">A7 · pin 29</text>
     <use href="#probe-red" transform="translate(553 517) rotate(13)"/>
@@ -47,6 +47,7 @@ const netDoc = '<svg class="doc" aria-hidden="true"><use href="#i-netfile"/></sv
 
 export function landingHtml() {
   return `<section class="landing" id="welcome" aria-labelledby="welcome-title">
+  <div class="fold">
   <header class="nav">
     <a class="brand" href="/" aria-label="CircuitDoctor home">${sym('cd-logo')}CircuitDoctor</a>
     <nav class="navr" aria-label="Site"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a><span class="stat" id="landing-status" role="status"><i class="live wait"></i>Graph DB…</span></nav>
@@ -75,7 +76,127 @@ export function landingHtml() {
     </div>
     <div class="pow">Powered by <b>FalkorDB graph</b><br>Connections from your file. No circuit simulation.</div>
   </footer>
+  </div>
+  ${belowFoldHtml()}
 </section>`;
+}
+
+// The exact trace query from circuitdoctor/paths.py (PATH_QUERY, MAX_HOPS = 32).
+// tests/test_paths.py checks that this page still shows the real query.
+export const PATH_QUERY_LINES = [
+  'MATCH (a:Pin {id:$start}),(b:Pin {id:$end})',
+  'WITH shortestPath((a)-[:ON_NET|THROUGH*0..32]-(b)) AS route',
+  'RETURN nodes(route), relationships(route)',
+];
+const keyword = (line: string) => esc(line).replace(/^(MATCH|WITH|RETURN)\b/, '<span class="k">$1</span>').replace(/ AS route$/, ' <span class="k">AS</span> route');
+
+function belowFoldHtml() {
+  const kicker = (n: string, text: string) => `<p class="kicker"><i>${n}</i>${text}</p>`;
+  return `<section class="sec" id="how" aria-labelledby="how-title">
+  <div class="sh"><div>${kicker('01', 'How it works')}<h2 class="display" id="how-title">Three steps.<br>One file.</h2></div>
+    <p>No account needed. You export one file from KiCad, drop it here, and we point at the problem.</p></div>
+  <div class="steps3">
+    <article class="step"><div class="ill"><svg viewBox="0 0 440 208" aria-hidden="true" font-family="JetBrains Mono, monospace">
+      <rect x="44" y="34" width="228" height="140" rx="8" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="2"/><path d="M44 56H272" stroke="#1D1C1A" stroke-width="1.5"/>
+      <circle cx="58" cy="45" r="3" fill="#B5AFA2"/><circle cx="69" cy="45" r="3" fill="#B5AFA2"/><circle cx="80" cy="45" r="3" fill="#B5AFA2"/>
+      <text x="56" y="73" font-size="11" fill="#1D1C1A" font-weight="600">File</text><text x="92" y="73" font-size="11" fill="#8A867E">Edit</text><text x="128" y="73" font-size="11" fill="#8A867E">View</text>
+      <rect x="52" y="80" width="112" height="82" rx="5" fill="#FBFAF7" stroke="#C9C3B6"/><text x="62" y="98" font-size="10.5" fill="#8A867E">Save</text><text x="62" y="118" font-size="10.5" fill="#8A867E">Print…</text>
+      <rect x="56" y="127" width="104" height="22" rx="4" fill="#1D1C1A"/><text x="62" y="142" font-size="10.5" fill="#F6F4EF" font-weight="600">Export</text><text x="152" y="142" font-size="10.5" fill="#F6F4EF" text-anchor="end">▸</text>
+      <rect x="166" y="124" width="96" height="28" rx="5" fill="#FBFAF7" stroke="#1D1C1A" stroke-width="1.5"/><text x="176" y="142" font-size="10.5" fill="#1D1C1A" font-weight="600">Netlist…</text>
+      <path d="M290 104H330" stroke="#1D1C1A" stroke-width="2" stroke-linecap="round"/><path d="M323 97l8 7-8 7" fill="none" stroke="#1D1C1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <use href="#i-netfile" x="348" y="74" width="50" height="59"/><text x="373" y="152" text-anchor="middle" font-size="11" fill="#55524C">uno.net</text></svg></div>
+      <div class="tx"><span class="dial">1</span><div><h3>Export from KiCad</h3><p>In your schematic: <span class="mono">File ▸ Export ▸ Netlist…</span> Keep the KiCad format and save.</p></div></div></article>
+    <article class="step"><div class="ill"><svg viewBox="0 0 440 208" aria-hidden="true" font-family="JetBrains Mono, monospace">
+      <rect x="70" y="96" width="300" height="78" rx="12" fill="#F6F4EF" stroke="#ABA597" stroke-width="1.5" stroke-dasharray="5 4"/><text x="220" y="140" text-anchor="middle" font-size="11.5" fill="#8A867E">drop .net here</text>
+      <use href="#i-netfile" x="196" y="18" width="48" height="57"/><path d="M220 82v26" stroke="#1D1C1A" stroke-width="2" stroke-linecap="round"/>
+      <path d="M213 101l7 8 7-8" fill="none" stroke="#1D1C1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M176 34v16M166 44v14M264 34v16M274 44v14" stroke="#C9C3B6" stroke-width="2" stroke-linecap="round"/></svg></div>
+      <div class="tx"><span class="dial">2</span><div><h3>Drop the .net file</h3><p>Drag it onto the page, or click <strong>Choose .net file</strong>. We read every pin and every wire.</p></div></div></article>
+    <article class="step"><div class="ill"><svg viewBox="0 0 440 208" aria-hidden="true" font-family="JetBrains Mono, monospace">
+      <path d="M140 92H190V136H250V92H300" fill="none" stroke="#D4362A" stroke-width="3.5" stroke-linejoin="round"/><circle cx="220" cy="136" r="4.5" fill="#D4362A"/>
+      <circle cx="140" cy="92" r="9" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="3"/><circle cx="140" cy="92" r="2.8" fill="#1D1C1A"/>
+      <circle cx="300" cy="92" r="9" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="3"/><circle cx="300" cy="92" r="2.8" fill="#1D1C1A"/>
+      <text x="140" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#1D1C1A">5V</text><text x="300" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#1D1C1A">GND</text>
+      <use href="#probe-red" transform="translate(138 90) rotate(13) scale(.32)"/><use href="#probe-black" transform="translate(302 90) scale(-1 1) rotate(13) scale(.32)"/>
+      <path d="M220 141v15" stroke="#D4362A" stroke-width="1.5"/><rect x="180" y="156" width="80" height="22" rx="11" fill="#D4362A"/>
+      <text x="220" y="171" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">same wire</text></svg></div>
+      <div class="tx"><span class="dial">3</span><div><h3>See the short in red &amp; fix it</h3><p>The red and black probes mark the two pins that share a wire. Separate them in KiCad, then check the new file.</p></div></div></article>
+  </div>
+</section>
+<section class="sec" id="checks" aria-labelledby="checks-title">
+  <div class="sh"><div>${kicker('02', 'What it checks')}<h2 class="display" id="checks-title">The mistakes that<br>cook boards.</h2></div>
+    <p>Every check reads the connections in your file, so the same file always gives the same answer. Power and I2C checks cover the Arduino Uno R3, the classic Nano and supported OLED / LCD displays.</p></div>
+  <div class="checks">
+    <div>
+      <div class="ck"><span class="n">01</span><b>Power shorted to ground</b><code>5V ↔ GND</code></div>
+      <div class="ck"><span class="n">02</span><b>Two different voltages joined</b><code>5V ↔ 3V3</code></div>
+      <div class="ck"><span class="n">03</span><b>Display missing power</b><code>OLED / LCD</code></div>
+      <div class="ck"><span class="n">04</span><b>Display voltage too high or too low</b><code>VCC vs. rail</code></div>
+    </div>
+    <div>
+      <div class="ck"><span class="n">05</span><b>I2C SDA / SCL swapped or missing</b><code>board I2C pins</code></div>
+      <div class="ck"><span class="n">06</span><b>Pull-up resistors on I2C</b><code>SDA · SCL</code></div>
+      <div class="ck"><span class="n">07</span><b>Unconnected pins &amp; parts cut off</b><code>every part</code></div>
+      <div class="ck"><span class="n">08</span><b>Trace any two pins</b><code>pin → pin</code></div>
+    </div>
+  </div>
+  <p class="checks-note"><span class="ok-dot">${sym('i-check')}</span>Checks that pass stay quiet. Other parts are still shown, and checked for unconnected pins and separate groups.</p>
+</section>
+<section class="sec" id="graph" aria-labelledby="graph-title">
+  <div class="why">
+    <div>${kicker('03', 'Why a graph?')}<h2 class="display" id="graph-title">A circuit is<br>already a graph.</h2>
+      <p class="body">Parts have pins, and pins sit on wires (nets). We store your file exactly like that in <b>FalkorDB</b>, so “is 5V touching GND?” becomes one short question to the database.</p>
+      <p class="body">Tracing a connection is a single graph query: the shortest route from one pin to another, over wires and through 2-pin resistors. Every hop is shown, so you can see why.</p></div>
+    <div class="gpanel">
+      <div class="ph"><h2>How your file is stored</h2><span class="m"><i class="live"></i>FalkorDB</span></div>
+      <div class="gd"><svg viewBox="0 0 880 236" role="img" aria-label="A component has pins; each pin is on a net" font-family="JetBrains Mono, monospace">
+        <rect x="56" y="70" width="176" height="96" rx="10" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="2"/>
+        <text x="72" y="58" font-size="10.5" letter-spacing="1.2" fill="#8A867E">COMPONENT</text>
+        <text x="76" y="110" font-family="Bricolage Grotesque Variable, Bricolage Grotesque, sans-serif" font-size="19" font-weight="650" fill="#1D1C1A">Arduino Uno</text>
+        <text x="76" y="134" font-size="11.5" fill="#8A867E">A7 · Uno R3</text>
+        <path d="M232 118H352" stroke="#1D1C1A" stroke-width="2"/><path d="M344 111l9 7-9 7" fill="none" stroke="#1D1C1A" stroke-width="2" stroke-linejoin="round"/>
+        <rect x="246" y="96" width="92" height="18" rx="4" fill="#EFECE5"/><text x="292" y="109" text-anchor="middle" font-size="10.5" fill="#55524C">HAS_PIN</text>
+        <text x="398" y="58" text-anchor="middle" font-size="10.5" letter-spacing="1.2" fill="#8A867E">PIN</text>
+        <circle cx="398" cy="118" r="38" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="2"/>
+        <text x="398" y="117" text-anchor="middle" font-size="15" font-weight="600" fill="#1D1C1A">5V</text><text x="398" y="135" text-anchor="middle" font-size="10.5" fill="#8A867E">pin 5</text>
+        <path d="M436 118H556" stroke="#1D1C1A" stroke-width="2"/><path d="M548 111l9 7-9 7" fill="none" stroke="#1D1C1A" stroke-width="2" stroke-linejoin="round"/>
+        <rect x="452" y="96" width="88" height="18" rx="4" fill="#EFECE5"/><text x="496" y="109" text-anchor="middle" font-size="10.5" fill="#55524C">ON_NET</text>
+        <text x="576" y="58" font-size="10.5" letter-spacing="1.2" fill="#8A867E">NET</text>
+        <rect x="560" y="96" width="132" height="44" rx="22" fill="#F6F4EF" stroke="#1D1C1A" stroke-width="2"/><text x="626" y="123" text-anchor="middle" font-size="14" font-weight="600" fill="#1D1C1A">/SUPPLY</text>
+        <path d="M692 118H732M732 84V152M732 84H760M732 118H760M732 152H760" fill="none" stroke="#BDB7AB" stroke-width="2"/>
+        <circle cx="768" cy="84" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/><circle cx="768" cy="118" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/><circle cx="768" cy="152" r="8" fill="#F6F4EF" stroke="#BDB7AB" stroke-width="2"/>
+        <text x="784" y="88" font-size="11" fill="#8A867E">A7·GND ×3</text><text x="784" y="122" font-size="11" fill="#8A867E">J9·2</text><text x="784" y="156" font-size="11" fill="#8A867E">R12·1</text>
+        <text x="440" y="208" text-anchor="middle" font-size="11.5" fill="#8A867E">uno_short.net → 3 components · 2 connections  ·  2-pin resistors add Pin –THROUGH→ Pin</text>
+      </svg></div>
+      <div class="query"><span class="lbl">Trace uses this query</span>
+<pre>${PATH_QUERY_LINES.map(keyword).join('\n')}</pre>
+        <p class="res">Same file in, same answer out <span class="d">·</span> separate groups use FalkorDB’s algo.WCC</p></div>
+    </div>
+  </div>
+</section>
+<section class="sec" id="faq" aria-labelledby="faq-title">
+  <div class="sh"><div>${kicker('04', 'Questions')}<h2 class="display" id="faq-title">Good to know.</h2></div><p></p></div>
+  <div class="faq">
+    <div>
+      <div class="qa"><h3>Is this a simulator?</h3><p><b>No.</b> We only read which pins are connected in your file. We don’t model current, timing or parts behaving.</p></div>
+      <div class="qa"><h3>Which boards does it know?</h3><p><b>Arduino Uno R3 and classic Nano.</b> Other parts are shown and checked for unconnected pins and separate groups.</p></div>
+    </div>
+    <div>
+      <div class="qa"><h3>Do I need an account?</h3><p><b>No.</b> Drop a file and you get results. Nothing to sign up for.</p></div>
+      <div class="qa"><h3>Does AI decide the result?</h3><p><b>No.</b> The checks are fixed rules, so they always give the same answer. AI only explains a result in plain words, and shows the evidence it used.</p></div>
+    </div>
+  </div>
+</section>
+<section class="close" aria-label="Upload a netlist">
+  <svg class="doc" aria-hidden="true"><use href="#i-netfile"/></svg>
+  <div><h3>Ready when your board is.</h3><p>KiCad netlist · .net · up to 10 MiB · Arduino Uno R3, classic Nano</p></div>
+  <div class="btns"><button class="btn quiet sample-trigger" type="button">${sym('i-flask')}Try a sample circuit</button><button class="btn pri lg upload-trigger" type="button">Choose .net file <span class="kbd">${openShortcut}</span></button></div>
+</section>
+<footer class="pfoot">
+  <div class="brand sm">${sym('cd-logo')}CircuitDoctor<small>hackathon build · 2026</small></div>
+  <nav aria-label="Footer"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a></nav>
+  <div class="pow">Powered by <b>FalkorDB graph</b><br>Connections from your file. No circuit simulation.</div>
+</footer>`;
 }
 
 /** Drop-zone contents for the normal, wrong-file and offline states. */
