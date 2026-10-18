@@ -13,9 +13,17 @@ Built for [Graph Hacks: Context for AI Agents](https://www.wemakedevs.org/hackat
 CircuitDoctor checks the wiring described in a file. It is not a circuit simulator,
 and a result with no warnings does not certify that hardware is safe or working.
 
+[Live website](https://circuitdoctor-production.up.railway.app/) ·
 [Run locally](#run-with-docker) · [Try the test circuits](#try-it-without-kicad) ·
 [Graph model](#how-falkordb-does-the-work) · [Queries](#queries-the-product-runs) ·
 [Supported checks](#what-works) · [Development](#develop-locally)
+
+## Try it online
+
+Open **[CircuitDoctor](https://circuitdoctor-production.up.railway.app/)** — no local
+installation or API key is needed. Upload your own KiCad `.net` file, or download
+the test-circuit ZIP from the landing page to try the faulty and corrected files.
+Gemini chat is enabled on the hosted app, subject to available API quota.
 
 ## Run with Docker
 
@@ -170,8 +178,10 @@ voltage/current limits. A review without warnings does not prove that hardware
 works. Firmware, soldering, component health, general GPIO voltage compatibility,
 current consumption and required pull-ups are not verified. This is not a simulator.
 
-All published ports bind to loopback. This package is for local use; it has no
-user accounts and is not an authenticated public hosting setup.
+The included Docker Compose setup binds published ports to loopback for local use.
+The hosted demo runs on Railway with FalkorDB on a private network. The app has no
+user accounts or per-user access controls; anyone with a saved circuit URL can
+view that upload.
 
 ## How FalkorDB does the work
 
