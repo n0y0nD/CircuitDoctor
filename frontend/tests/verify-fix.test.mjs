@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CompareRequest, comparisonHtml, comparisonHeadline, connectionRows, comparisonFromHash, circuitHash } from '../src/verify-fix.ts';
+import { CompareRequest, comparisonWarningIsFault, comparisonHtml, comparisonHeadline, connectionRows, comparisonFromHash, circuitHash } from '../src/verify-fix.ts';
 const CID='a'.repeat(32), NEXT='b'.repeat(32);
 const file=()=>new File(['content'],'correction.net');
 const result=()=>({source:'falkordb',tool:'verify_fix',original_id:CID,corrected_id:NEXT,message:'One warning cleared',summary:{resolved:1,persists:0,new:0,unverified:0,added_connections:1,removed_connections:0},matching:{notes:[],added_components:[],removed_components:[],changed_components:[]},warnings:[],connections:[]});
@@ -115,4 +115,15 @@ test('new upload cancels a pending saved comparison restoration', async t => {
  const req=new CompareRequest(),states=[];const work=req.run(CID,NEXT,s=>states.push(s));
  req.cancel();finish(response({storage:{source:'falkordb',circuit_id:NEXT,filename:'saved.net'}}));await work;
  assert.equal(calls,1);assert.deepEqual(states.map(s=>s.status),['loading']);
+});
+
+
+test('comparison warnings keep faults red only on the side where they exist', () => {
+ const evidence = {nodes: [], edges: [], paths: []};
+ for (const status of ['resolved', 'persists', 'unverified', 'new']) {
+  const warning = {status, before: status === 'new' ? null : evidence, after: evidence};
+  assert.equal(comparisonWarningIsFault(warning, 'before'), status !== 'new');
+  assert.equal(comparisonWarningIsFault(warning, 'after'), status === 'persists' || status === 'new');
+ }
+ assert.equal(comparisonWarningIsFault(undefined, 'before'), false);
 });

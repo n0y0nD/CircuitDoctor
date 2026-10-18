@@ -52,7 +52,7 @@ let review: ReviewState = { status: "idle" };
 let selectedFinding: Finding | null = null;
 let chatEvidence: Pick<Explanation, "evidence"> | null = null;
 let evidenceLabel = "";
-let evidenceKind: "" | "chat" | "trace" | "compare" = "";
+let evidenceKind: "" | "chat" | "trace" | "compare" | "compare-issue" = "";
 let traceRoute: TracedRoute | null = null;
 
 function clearReview() {
@@ -83,7 +83,6 @@ $("#app").innerHTML = `
       <div class="menu-list" id="more-list" role="menu" hidden>
         <button type="button" role="menuitem" data-open-trace>${sym("i-trace")}Trace a connection</button>
         <button type="button" role="menuitem" id="open-verify" aria-controls="verify-panel" aria-expanded="false">${sym("i-check")}Check an updated file</button>
-        <button type="button" role="menuitem" class="upload-trigger">${sym("i-upload")}Upload another file</button>
         <label class="toggle-label" role="menuitemcheckbox"><input type="checkbox" id="unused-toggle"/><span>Show unconnected pins</span></label>
         <button type="button" role="menuitem" id="expand-canvas">${icon("fit", 15)}<span>Expand drawing</span></button>
         <button type="button" role="menuitem" id="reset-layout">${icon("graph", 15)}Reset layout</button>
@@ -166,18 +165,19 @@ const chatPanel = new ChatPanel($("#chat-panel"), (evidence, label) => {
 function setChatFocus(focused: boolean) {
   $("#circuit-section").classList.toggle("chat-focus", focused && chatPanel.hasConversation);
 }
-const verifyPanel = new VerifyPanel($("#verify-panel"), async (id, evidence) => {
+const verifyPanel = new VerifyPanel($("#verify-panel"), async (id, evidence, isFault) => {
   if (circuit?.storage.circuit_id !== id) await readCircuit(`/api/circuits/${encodeURIComponent(id)}`, "saved circuit", {}, true, false);
   if (circuit?.storage.circuit_id !== id) return;
   verifyPanel.setViewing(id);
-  if (evidence) showEvidence(evidence, true, "Showing · wiring from the comparison", "compare");
+  if (evidence) showEvidence(evidence, true, isFault ? "Showing · problem wiring" : "Showing · wiring from the comparison", isFault ? "compare-issue" : "compare");
   else showChanges();
+  renderReview();
 }, $("#open-verify"), result => {
   activeComparison = result ? { original_id: result.original_id, corrected_id: result.corrected_id } : null;
   chatPanel.setComparison(activeComparison);
   if (circuit) history.replaceState(null, "", circuitHash(circuit.storage.circuit_id, activeComparison));
   if (result) showChanges();
-  else if (evidenceKind === "compare") showEvidence(null);
+  else if (evidenceKind.startsWith("compare")) showEvidence(null);
   renderReview();
 }, () => {
   if (verifyPanel.isOpen) {
@@ -185,15 +185,14 @@ const verifyPanel = new VerifyPanel($("#verify-panel"), async (id, evidence) => 
     showChanges();
   }
   // Closing the comparison returns the drawing to the problem view.
-  if (!verifyPanel.isOpen && evidenceKind === "compare") {
+  if (!verifyPanel.isOpen && evidenceKind.startsWith("compare")) {
     showEvidence(null);
     const first = review.status === "success" ? groupFindings(review.result).problems[0] : null;
     if (first) showFinding(expandedFinding || first.id, false); else showEvidence(null);
   }
   renderReview();
 });
-// Green marks the wires that changed between the two files: added ones on the
-// updated circuit, removed ones on the earlier circuit.
+// Changed wires are green; reopening the earlier circuit restores its fault in red.
 function changeEvidence(result: Comparison, viewingUpdated: boolean): Explanation["evidence"] {
   const wanted = result.connections.filter(c => c.status === (viewingUpdated ? "added" : "removed"));
   const nodes = new Map(wanted.flatMap(c => c.evidence.nodes).map(n => [n.id, { id: n.id, kind: n.kind }]));
@@ -202,8 +201,17 @@ function changeEvidence(result: Comparison, viewingUpdated: boolean): Explanatio
 function showChanges() {
   const result = verifyPanel.comparison;
   if (!result || !circuit) return;
-  const evidence = changeEvidence(result, circuit.storage.circuit_id === result.corrected_id);
-  if (evidence.nodes.length) showEvidence(evidence, false, "Showing · what changed", "compare");
+  const viewingUpdated = circuit.storage.circuit_id === result.corrected_id;
+  const problems = review.status === "success" ? groupFindings(review.result).problems : [];
+  const earlierFault = !viewingUpdated && (problems.find(p => p.id === expandedFinding) || problems[0]);
+  if (earlierFault) {
+    showEvidence(null);
+    showFinding(earlierFault.id, false);
+  } else {
+    const evidence = changeEvidence(result, viewingUpdated);
+    showEvidence(evidence.nodes.length ? evidence : null, false, "Showing · what changed", "compare");
+  }
+  renderReview();
 }
 const pathPanel = new PathPanel($("#path-panel"),
   (evidence, reveal) => showEvidence(evidence, reveal, evidence ? "Showing · traced route" : "", "trace"),
@@ -486,7 +494,7 @@ function renderView() {
     );
     graph.select(selection);
     graph.search(query);
-    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null), selectedFinding ? "issue" : evidenceKind === "compare" ? "change" : "route", focusLabel());
+    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null), selectedFinding || evidenceKind === "compare-issue" ? "issue" : evidenceKind === "compare" ? "change" : "route", focusLabel());
     graph.setProbes(probeTargets());
   } else renderList();
   renderKey();
@@ -654,6 +662,7 @@ function fixSteps(done: boolean) {
 }
 function renderKey() {
   const key = $("#canvas-key");
+  if (evidenceKind === "compare-issue") { key.innerHTML = '<s class="swatch red"></s>Red = the problem'; return; }
   if (evidenceKind === "compare") { key.innerHTML = '<s class="swatch green"></s>Green = what changed'; return; }
   if (traceOpen()) { key.innerHTML = traceRoute ? '<s class="swatch ink"></s>Dark = the traced route' : ""; return; }
   if (review.status !== "success") { key.innerHTML = ""; return; }
@@ -704,16 +713,16 @@ function renderReview() {
   const tracing = traceOpen();
   const comparison = verifyPanel.comparison;
   const comparing = !!comparison && verifyPanel.isOpen;
+  const viewingUpdated = comparing && circuit?.storage.circuit_id === comparison?.corrected_id;
   $("#circuit-section").classList.toggle("compare-done", comparing);
   if (circuit) verifyPanel.setViewing(circuit.storage.circuit_id);
-  const names = verifyPanel.names;
-  $("#topbar-filename").innerHTML = comparing ? `<span class="old">${esc(names.before)}</span> <span class="arr">→</span> ${esc(names.after)}` : esc(filename);
-  meterOverride = traceRoute ? meterOverride : comparing && isFixed(comparison!) ? { flag: "PASS", text: `${comparison!.summary.resolved} problem${comparison!.summary.resolved === 1 ? "" : "s"} cleared` } : null;
+  $("#topbar-filename").textContent = comparing ? `${viewingUpdated ? "Updated" : "Earlier"} · ${filename}` : filename;
+  meterOverride = traceRoute ? meterOverride : viewingUpdated && isFixed(comparison!) ? { flag: "PASS", text: `${comparison!.summary.resolved} problem${comparison!.summary.resolved === 1 ? "" : "s"} cleared` } : null;
   renderMeter();
   button.hidden = !workspace || clean || tracing || comparing;
   $("#back-to-problem").hidden = !workspace || !tracing || !problems.length;
-  $("#replace-file").hidden = !workspace || !clean || tracing || comparing || !(review.status === "success" && boardRecognized(review.result));
-  const fixedNow = comparing && isFixed(comparison!);
+  $("#replace-file").hidden = !workspace;
+  const fixedNow = viewingUpdated && isFixed(comparison!);
   $("#fix-steps").hidden = !(problems.length || fixedNow) || tracing;
   $("#fix-steps").innerHTML = fixedNow ? fixSteps(true) : problems.length ? fixSteps(false) : "";
   renderKey();
@@ -781,6 +790,7 @@ document.addEventListener("click", (event) => {
   if (showPart) { view = "graph"; renderView(); selectItem({ kind: "component", id: showPart.dataset.showPart! }); }
   if (target.closest("#review-strip [data-chat-back]")) setChatFocus(false);
   if (target.closest("[data-open-trace]")) openTrace();
+  if (target.closest("[data-open-verify]")) $("#open-verify").click();
   if (target.closest("[data-close-trace], #back-to-problem")) closeTrace();
   if (target.closest("#close-inspector")) { selection = null; graph?.select(null); renderInspector(); }
   const menu = $("#more-list");

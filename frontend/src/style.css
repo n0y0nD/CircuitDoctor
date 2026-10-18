@@ -100,13 +100,13 @@ button.pill:hover { border-color: var(--ink4); color: var(--ink); background: va
 .lcd .flag { background: var(--lcd-ink); color: var(--lcd); font-size: 10px; letter-spacing: .08em; padding: 1px 5px; border-radius: 2px; }
 
 /* ---------- top bar ---------- */
-.topbar { display: flex; align-items: center; gap: 18px; min-height: 64px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--line); background: var(--bone); }
+.topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; min-height: 64px; padding: 12px 16px 12px 20px; border-bottom: 1px solid var(--line); background: var(--bone); }
 .topbar .vr { width: 1px; height: 28px; background: var(--line); flex: none; }
 .topbar .file { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topbar .file > svg { width: 18px; height: 22px; }
-.topbar .file b { font-family: var(--mono); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.topbar .file b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 14px; font-weight: 600; white-space: nowrap; }
 .topbar .file span { font-size: 14px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.header-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; margin-left: auto; }
 .header-actions .btn svg { width: 14px; height: 14px; }
 
 /* ---------- status bar ---------- */

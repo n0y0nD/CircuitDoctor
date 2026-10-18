@@ -9,6 +9,11 @@ export interface Comparison {
   connections: { status: 'added' | 'removed'; pins: {ref: string; pin: string; name: string; pinfunction: string}[]; evidence: Evidence }[];
   truncated: boolean;
 }
+// A resolved warning is still a fault in the earlier file, but not in the updated file.
+export function comparisonWarningIsFault(warning: Comparison['warnings'][number] | undefined, side: string): boolean {
+  return !!warning && (side === 'before' ? !!warning.before : side === 'after' && ['persists', 'new'].includes(warning.status));
+}
+
 export type CompareState = { status: 'loading' } | { status: 'success'; result: Comparison; filename: string } | { status: 'error'; message: string };
 
 export class CompareRequest {

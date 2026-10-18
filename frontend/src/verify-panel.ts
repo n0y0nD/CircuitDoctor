@@ -1,4 +1,4 @@
-import { CompareRequest, comparisonHeadline, comparisonHtml, type Comparison, type CompareState } from './verify-fix.ts';
+import { CompareRequest, comparisonWarningIsFault, comparisonHeadline, comparisonHtml, type Comparison, type CompareState } from './verify-fix.ts';
 import { escapeHtml as esc, type Circuit } from './types.ts';
 import type { Explanation } from './explanation.ts';
 
@@ -16,7 +16,7 @@ export class VerifyPanel {
   private correctedName = '';
   private comparedAt = 0;
   private viewingId = '';
-  constructor(private root: HTMLElement, private inspect: (id: string, evidence: Explanation['evidence'] | null) => Promise<void>, private trigger: HTMLButtonElement, private onComparison: (comparison: Comparison | null) => void, private onToggle: () => void = () => {}) {
+  constructor(private root: HTMLElement, private inspect: (id: string, evidence: Explanation['evidence'] | null, isFault: boolean) => Promise<void>, private trigger: HTMLButtonElement, private onComparison: (comparison: Comparison | null) => void, private onToggle: () => void = () => {}) {
     trigger.addEventListener('click', () => this.setOpen(Boolean(this.root.hidden)));
     root.addEventListener('click', event => {
       const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
@@ -31,7 +31,7 @@ export class VerifyPanel {
       const wi = target.dataset.compareWarning, ci = target.dataset.compareConnection;
       const evidence = wi !== undefined ? result.warnings[Number(wi)]?.[side === 'before' ? 'before' : 'after']
         : ci !== undefined ? result.connections[Number(ci)]?.evidence : null;
-      void this.inspect(id, evidence || null);
+      void this.inspect(id, evidence || null, wi !== undefined && comparisonWarningIsFault(result.warnings[Number(wi)], side));
     });
     root.addEventListener('change', event => {
       const input = event.target as HTMLInputElement;

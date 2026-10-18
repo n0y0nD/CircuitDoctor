@@ -139,6 +139,7 @@ export function reviewPanelHtml(state: ReviewState, ctx: PanelContext) {
         ? `<article class="card open"><div class="card-title"><span class="num">${i + 1}</span>${problemBody(p, ctx.circuit).replace('<h3>', '<h3 class="in-card">')}</div></article>`
         : `<button class="card" type="button" data-expand-finding="${esc(p.id)}"><span class="num">${i + 1}</span><strong>${esc(friendlyFinding(p).title)}</strong>${chev}</button>`).join('')}</div>`
         : problemBody(open, ctx.circuit)}
+      <div class="acts-row"><button class="btn" type="button" data-open-verify aria-controls="verify-panel">${sym('i-upload')}Upload updated file</button></div>
       <div class="rows">
         ${pathPins > 1 ? detailsRow('<span class="minipath" aria-hidden="true"><i></i><b></b><i></i><b></b><i></i></span>', 'See the full path', `${pathPins} pins`, fullPath(open, ctx.circuit), 'path-row') : ''}
         ${checksRow(result, false)}

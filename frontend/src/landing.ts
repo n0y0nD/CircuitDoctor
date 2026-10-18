@@ -64,7 +64,7 @@ export function landingHtml() {
       <button class="btn pri lg upload-trigger" type="button">Choose .net file <span class="kbd">${openShortcut}</span></button>
     </section>
     <div class="links">
-
+      <a class="u" href="/downloads/circuitdoctor-test-circuits.zip" download="circuitdoctor-test-circuits.zip" title="Arduino, resistor and LED: faulty and corrected .net files, with instructions">Download test circuits (.zip)</a>
       <button class="u help-trigger" type="button">Where do I get a .net file?</button>
     </div>
   </div>
