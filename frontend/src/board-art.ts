@@ -45,12 +45,12 @@ export function boardDrawing(circuit: Circuit, component: Component, visiblePins
   const ports=new Map([...allPorts].filter(([pin])=>!visiblePins || visiblePins.has(pin)));
   const hole=(x:number,y:number)=>`<circle cx="${x}" cy="${y}" r="10" fill="#d0b982" stroke="#edd8a6" stroke-width="2"/><circle cx="${x}" cy="${y}" r="5.5" fill="#f4f8f7" stroke="#536e76"/>`;
   const socket=(x:number,y:number,on=false)=>`<rect x="${x-7}" y="${y-8}" width="14" height="16" rx="1.5" fill="${on?'#eabf57':'#25323b'}" stroke="${on?'#fff0af':'#52616a'}"/><circle cx="${x}" cy="${y}" r="3" fill="#080f16" stroke="#64737b" stroke-width=".7"/>`;
-  const headers=slots.map(s=>`${socket(s.x,s.y)}<text transform="translate(${s.x+4} ${s.side==='top'?49:boardHeight-48}) rotate(-90)" text-anchor="${s.side==='top'?'end':'start'}" font-size="9" fill="#d1e8ed">${s.label}</text>`).join('');
+  const headers=slots.map(s=>`${socket(s.x,s.y)}${[...ports.values()].some(p=>p.connected && p.x===s.x && p.y===s.y)?'':`<text transform="translate(${s.x+4} ${s.side==='top'?49:boardHeight-48}) rotate(-90)" text-anchor="${s.side==='top'?'end':'start'}" font-size="9" fill="#d1e8ed">${s.label}</text>`}`).join('');
   const activeSockets=[...ports.values()].map(p=>{
     const duplicate=pins.filter(o=>o.label===p.label).length>1;
     const slot=slots.find(s=>s.x===p.x && s.y===p.y);
     const label=`${slot?.label ?? p.label}${duplicate?` #${p.pin}`:''}`;
-    return `${socket(p.x,p.y,p.connected)}${p.side==='right'?`<text x="${p.x+13}" y="${p.y+4}" font-size="12" fill="#344e60">${esc(label)}</text>`:p.connected?`<text x="${p.x}" y="${p.side==='top'?12:boardHeight-9}" text-anchor="middle" font-size="10" font-weight="700" fill="#173e52" stroke="#f8fbfc" stroke-width="3" paint-order="stroke">${esc(label)}</text>`:''}`;
+    return `${socket(p.x,p.y,p.connected)}${p.side==='right'?`<text x="${p.x+13}" y="${p.y+4}" font-size="12" fill="#344e60">${esc(label)}</text>`:p.connected?`<text transform="translate(${p.x+4} ${p.side==='top'?49:boardHeight-48}) rotate(-90)" text-anchor="${p.side==='top'?'end':'start'}" font-size="12" font-weight="700" fill="#f8fbfc" stroke="#173e52" stroke-width="2" paint-order="stroke">${esc(label)}</text>`:''}`;
   }).join('');
   const chip=(x:number,y:number,w:number,h:number,n:number)=>`<g>${Array.from({length:n},(_,i)=>`<path d="M${x+9+i*(w-18)/(n-1)} ${y-7}v${h+14}" stroke="#bec7cd" stroke-width="5"/>`).join('')}<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="url(#chip)" stroke="#101c26" stroke-width="2"/><circle cx="${x+10}" cy="${y+11}" r="3" fill="#66727a"/></g>`;
   const passives=Array.from({length:8},(_,i)=>`<g transform="translate(${155+i*36} ${nano?91:150})"><rect width="17" height="8" rx="1" fill="#bec4c7"/><rect x="4" width="9" height="8" fill="${i%2?'#393a38':'#b99f77'}"/></g>`).join('');

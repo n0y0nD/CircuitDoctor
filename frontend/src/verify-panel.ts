@@ -21,7 +21,7 @@ export class VerifyPanel {
     root.addEventListener('click', event => {
       const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
       if (!target) return;
-      if (target.hasAttribute('data-close-verify')) { this.setOpen(false); this.trigger.focus(); return; }
+      if (target.hasAttribute('data-close-verify')) { this.close(); this.trigger.focus(); return; }
       if (target.hasAttribute('data-corrected-upload')) root.querySelector<HTMLInputElement>('input')?.click();
       if (!this.result) return;
       const side = target.dataset.side;
@@ -64,6 +64,11 @@ export class VerifyPanel {
       this.renderState(state);
       if (state.status === 'error') this.setOpen(true);
     });
+  }
+  close() {
+    this.cancel();
+    if (!this.result && this.circuit) this.root.innerHTML = this.startHtml();
+    this.setOpen(false);
   }
   cancel() { this.request.cancel(); }
   setCircuit(circuit: Circuit | null) {

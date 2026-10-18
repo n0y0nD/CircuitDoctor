@@ -180,8 +180,13 @@ const verifyPanel = new VerifyPanel($("#verify-panel"), async (id, evidence) => 
   else if (evidenceKind === "compare") showEvidence(null);
   renderReview();
 }, () => {
+  if (verifyPanel.isOpen) {
+    closeTrace();
+    showChanges();
+  }
   // Closing the comparison returns the drawing to the problem view.
   if (!verifyPanel.isOpen && evidenceKind === "compare") {
+    showEvidence(null);
     const first = review.status === "success" ? groupFindings(review.result).problems[0] : null;
     if (first) showFinding(expandedFinding || first.id, false); else showEvidence(null);
   }
@@ -211,6 +216,7 @@ const pathPanel = new PathPanel($("#path-panel"),
   });
 function traceOpen() { return $("#circuit-section").classList.contains("trace-open"); }
 function openTrace() {
+  verifyPanel.close();
   setChatFocus(false);
   $("#circuit-section").classList.add("trace-open");
   // Start from the shown fault's red-probe pin, if there is one.

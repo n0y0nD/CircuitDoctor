@@ -5,6 +5,7 @@ import { boardDrawing } from './board-art';
 import { partDrawing, groundImage, isGroundNet } from './part-art';
 import { evidenceMemberships, type Explanation } from './explanation';
 import { simpleWireRoute } from './wire-routing';
+import { placeParts } from './graph-layout';
 import { connectionFocus } from './graph-focus';
 import { probesSvg, type ProbeEnd } from './probes';
 
@@ -25,6 +26,7 @@ export class CircuitGraph {
   private focusStatus: HTMLElement;
   private overlay: SVGSVGElement;
   private probes: ProbeTargets | null = null;
+  private userViewport = false;
   constructor(container: HTMLElement, private circuit: Circuit, showUnused: boolean,
     onSelect: (selection: Selection) => void, onZoom: (value: number) => void, selection: Selection | null = null) {
     const key = circuit.storage.circuit_id;
@@ -52,16 +54,12 @@ export class CircuitGraph {
       if(selection?.kind==='pin' && selection.ref===c.ref) shownPins.add(selection.pin);
       return [c.ref,componentKind(c)==='board'?boardDrawing(circuit,c,showUnused?undefined:shownPins):partDrawing(circuit,c)] as const;
     }).filter((entry): entry is readonly [string, ReturnType<typeof boardDrawing>] => entry[1] !== null));
-    const positions = new Map<string,{x:number;y:number;width:number;height:number}>();
-    for(const component of circuit.components) {
-      const level = levels.get(component.ref) ?? 1;
-      const pins = nets.flatMap(n=>n.nodes.filter(p=>p.ref===component.ref));
-      const board = componentKind(component)==='board';
-      const height = drawings.get(component.ref)?.height ?? Math.max(140,Math.ceil(pins.length/2)*28+55);
-      const previous = circuit.components.filter(c=>positions.has(c.ref) && (levels.get(c.ref)??1)===level);
-      const y = previous.reduce((total,c)=>total+positions.get(c.ref)!.height+120,0)+height/2;
-      positions.set(component.ref,{x:level*700,y:Math.max(y,200),width:drawings.get(component.ref)?.width ?? 180,height});
-    }
+    const positions = placeParts(circuit.components.map(component => {
+      const pins = nets.flatMap(n => n.nodes.filter(p => p.ref === component.ref));
+      const drawing = drawings.get(component.ref);
+      return { ref: component.ref, level: levels.get(component.ref) ?? 1,
+        width: drawing?.width ?? 180, height: drawing?.height ?? Math.max(140, Math.ceil(pins.length / 2) * 28 + 55) };
+    }));
     const elements: ElementDefinition[] = [];
     const portSides = new Map<string, number>();
     const verticalPorts = new Map<string, number>();
@@ -214,7 +212,7 @@ export class CircuitGraph {
       style:[
         {selector:'node[kind = "component"]',style:{shape:'round-rectangle',width:'data(width)',height:'data(height)',
           'background-image':'data(image)','background-fit':'contain','background-opacity':0,'border-width':0,
-          label:'data(label)','font-family':'"Bricolage Grotesque Variable", "Bricolage Grotesque", sans-serif','font-size':15,'font-weight':700,color:'#1D1C1A','text-valign':'bottom','text-margin-y':14,
+          label:'data(label)','font-family':'"Bricolage Grotesque Variable", "Bricolage Grotesque", sans-serif','font-size':18,'font-weight':700,color:'#1D1C1A','text-valign':'top','text-margin-y':-24,
           'text-max-width':'280px','text-wrap':'wrap','overlay-opacity':0,'bounds-expansion':6}},
         {selector:'node[kind = "pin"]',style:{width:8,height:8,'background-color':'#f5d580','border-width':1.5,'border-color':'#7b6a3e',
           label:'data(label)','font-family':'"JetBrains Mono Variable", "JetBrains Mono", monospace','font-size':11,color:'#55524C','text-valign':'top','text-margin-y':-7,'text-background-color':'#EFECE5',
@@ -291,7 +289,7 @@ export class CircuitGraph {
       if(d.kind==='anchor') return;
       onSelect(d.kind==='component'?{kind:'component',id:d.ref}:d.kind==='pin'?{kind:'pin',id:d.id,ref:d.ref,pin:d.pin}:{kind:'net',id:d.code});
     });
-    this.cy.on('dbltap','node[kind = "component"]',event=>this.cy.fit(event.target,30));
+    this.cy.on('dbltap','node[kind = "component"]',event=>{this.userViewport=true;this.cy.fit(event.target,30);});
     this.cy.on('tap','edge[kind = "wire"]',event=>onSelect({kind:'net',id:event.target.data('code')}));
     this.focusStatus = document.createElement('div');
     this.focusStatus.className = 'canvas-focus';
@@ -305,11 +303,13 @@ export class CircuitGraph {
     this.cy.on('render', () => this.drawProbes());
     this.cy.on('mouseover','node, edge[kind = "wire"]',()=>{container.style.cursor='grab';});
     this.cy.on('mouseout','node, edge',()=>{container.style.cursor='grab';});
+    this.cy.on('dragpan scrollzoom pinchzoom', () => { this.userViewport = true; });
     this.cy.on('zoom',()=>onZoom(Math.round(this.cy.zoom()*100)));
     let size = { width: container.clientWidth, height: container.clientHeight };
     this.observer = new ResizeObserver(() => {
       const next = { width: container.clientWidth, height: container.clientHeight };
       if (next.width === size.width && next.height === size.height) return;
+      if (!this.userViewport) { size = next; this.fit(); return; }
       // Resize without discarding the user's zoom or the point they were looking at.
       const pan = this.cy.pan();
       this.cy.resize();
@@ -409,12 +409,12 @@ export class CircuitGraph {
     const refs=new Set(matches.map(n=>n.data('ref')).filter(Boolean));
     this.cy.elements().filter(e=>refs.has(e.data('ref'))).removeClass('muted');
   }
-  zoomBy(amount:number) {this.cy.zoom({level:this.cy.zoom()*amount,renderedPosition:{x:this.cy.width()/2,y:this.cy.height()/2}});}
+  zoomBy(amount:number) {this.userViewport=true;this.cy.zoom({level:this.cy.zoom()*amount,renderedPosition:{x:this.cy.width()/2,y:this.cy.height()/2}});}
   resetLayout() {
     this.arrangement.clear();
     this.cy.batch(() => this.initial.forEach((position, id) => this.cy.getElementById(id).position(position)));
     this.fit();
   }
-  fit(){this.cy.resize();this.cy.fit(undefined,35);}
+  fit(){this.userViewport=false;this.cy.resize();this.cy.fit(undefined,35);}
   destroy(){this.observer.disconnect();this.focusStatus.remove();this.overlay.remove();this.cy.destroy();}
 }

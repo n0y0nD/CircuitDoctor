@@ -2,10 +2,17 @@ import { escapeHtml } from './types.ts';
 
 // Deliberately limited formatting: model text never supplies HTML or link targets.
 function inline(text: string): string {
-  const tokens = /`([^`\n]+)`|\*\*(\S(?:[^*\n]*\S)?)\*\*|__([^_\n]+)__|\*(\S(?:[^*\n]*\S)?)\*/g;
+  // Only unwrap simple electrical labels, not prices or arbitrary LaTeX.
+  const electrical = String.raw`[+-]?(?:\d+(?:\.\d+)?\s*(?:V|mV|A|mA|uA|µA|Ω|kΩ|MΩ|ohms?|Hz|kHz|MHz)|[A-Za-z][A-Za-z0-9_+-]*)`;
+  const tokens = new RegExp(String.raw`\x60([^\x60\n]+)\x60|\*\*(\S(?:[^*\n]*\S)?)\*\*|__([^_\n]+)__|\*(\S(?:[^*\n]*\S)?)\*|\$(${electrical})\$|\\\((${electrical})\\\)`, 'g');
   let html = '', end = 0;
   for (const match of text.matchAll(tokens)) {
     html += escapeHtml(text.slice(end, match.index));
+    if (match[5] !== undefined || match[6] !== undefined) {
+      html += escapeHtml(match[5] ?? match[6]);
+      end = match.index! + match[0].length;
+      continue;
+    }
     const tag = match[1] !== undefined ? 'code' : match[4] !== undefined ? 'em' : 'strong';
     html += `<${tag}>${escapeHtml(match[1] ?? match[2] ?? match[3] ?? match[4])}</${tag}>`;
     end = match.index! + match[0].length;

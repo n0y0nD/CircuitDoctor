@@ -16,3 +16,9 @@ test('preserves plain text and electrical notation, groups lists and handles CRL
   assert.equal(formatChatAnswer('V = I * R + I * R\r\nCheck A_B.\r\n\r\n1. Check GND [E1].\r\n2. Check VCC.\r\n   Then retry.\r\n\r\nDone.'),
     '<p>V = I * R + I * R<br>Check A_B.</p><ol><li>Check GND [E1].</li><li>Check VCC. Then retry.</li></ol><p>Done.</p>');
 });
+test('unwraps electrical math labels while preserving prices, literal code and HTML safety', () => {
+  assert.equal(formatChatAnswer('The $+5V$ rail and $GND$ pin, \\(3.3V\\) and $R12$ [E2].'),
+    '<p>The +5V rail and GND pin, 3.3V and R12 [E2].</p>');
+  assert.equal(formatChatAnswer('Costs $5 to $10. Literal `$+5V$`; $<script>x</script>$.'),
+    '<p>Costs $5 to $10. Literal <code>$+5V$</code>; $&lt;script&gt;x&lt;/script&gt;$.</p>');
+});
