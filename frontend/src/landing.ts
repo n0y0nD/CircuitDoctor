@@ -50,7 +50,7 @@ export function landingHtml() {
   <div class="fold">
   <header class="nav">
     <a class="brand" href="/" aria-label="CircuitDoctor home">${sym('cd-logo')}CircuitDoctor</a>
-    <nav class="navr" aria-label="Site"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a><span class="stat" id="landing-status" role="status"><i class="live wait"></i>Connecting…</span></nav>
+    <nav class="navr" aria-label="Site"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a></nav>
   </header>
   <div class="hero">
     <p class="kicker">Continuity test <b>·)))</b> for KiCad netlists</p>
@@ -181,7 +181,7 @@ function belowFoldHtml() {
   <div class="btns"><button class="btn pri lg upload-trigger" type="button">Choose .net file <span class="kbd">${openShortcut}</span></button></div>
 </section>
 <footer class="pfoot">
-  <div class="brand sm">${sym('cd-logo')}CircuitDoctor<small>hackathon build · 2026</small></div>
+  <div class="brand sm">${sym('cd-logo')}CircuitDoctor</div>
   <nav aria-label="Footer"><a href="#how">How it works</a><a href="${GITHUB_URL}" target="_blank" rel="noopener noreferrer">GitHub</a></nav>
   <div class="pow">Connections from your file. No circuit simulation.</div>
 </footer>`;

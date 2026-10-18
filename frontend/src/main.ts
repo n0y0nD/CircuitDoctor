@@ -237,8 +237,6 @@ function connectionState(online: boolean) {
   element.classList.toggle("offline", !online);
   element.innerHTML = `<i class="live"></i>${online ? "Ready" : "Unavailable"}`;
   $("#db-status").classList.toggle("offline", !online);
-  $("#landing-status").classList.toggle("offline", !online);
-  $("#landing-status").innerHTML = element.innerHTML;
   serviceOnline = online;
   if (!online) { setDrop({ kind: "offline", server: !apiReachable }); scheduleStatusCheck(); }
   else if (dropState.kind === "offline") setDrop({ kind: "ready" });
