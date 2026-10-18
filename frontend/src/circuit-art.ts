@@ -1,4 +1,4 @@
-import { componentKind, escapeHtml as esc, type Component } from './types';
+import { boardIdentity, componentKind, escapeHtml as esc, type Component } from './types';
 
 const bandColors = ['#24262b', '#78472d', '#bf3636', '#ed8133', '#e7c845', '#448562', '#3d68ad', '#8c5899', '#8a8f95', '#f6f1de'];
 
@@ -18,7 +18,8 @@ function resistorBands(value: string): string {
 /** Recognizable illustrations, not physical pinout or footprint drawings. */
 export function circuitArt(component: Component, height: number): string {
   const kind = componentKind(component);
-  const nano = component.libsource.part === 'Arduino_Nano_v3.x';
+  const identity = boardIdentity(component);
+  const nano = identity === 'nano' || identity === 'nano-unspecified';
   const width = kind === 'board' ? 260 : 180;
   const y = height / 2;
   const defs = `<defs>
@@ -41,11 +42,11 @@ export function circuitArt(component: Component, height: number): string {
       <rect x="${nano?110:64}" y="10" width="${nano?40:46}" height="22" rx="2" fill="#5b6c78"/><rect x="${nano?116:72}" y="17" width="${nano?28:30}" height="8" fill="#b9c4c9"/>
       ${nano?'':`<rect x="155" y="18" width="43" height="34" rx="4" fill="#1e303a"/><ellipse cx="177" cy="20" rx="15" ry="8" fill="#101d24" stroke="#4a5a62"/>`}
       <text x="130" y="${y-50}" text-anchor="middle" fill="#e6f6ef" font-family="Arial,sans-serif" font-weight="bold" font-size="${nano?18:24}" letter-spacing="1">ARDUINO</text>
-      <text x="130" y="${y-30}" text-anchor="middle" fill="#bcdfdf" font-family="Arial,sans-serif" font-size="12" letter-spacing="2">${nano?'CLASSIC NANO':'UNO R3'}</text>
+      <text x="130" y="${y-30}" text-anchor="middle" fill="#bcdfdf" font-family="Arial,sans-serif" font-size="12" letter-spacing="2">${identity === 'nano-unspecified' ? 'NANO' : nano ? 'CLASSIC NANO' : 'UNO R3'}</text>
       <rect x="${nano?98:75}" y="${y-7}" width="${nano?64:110}" height="${nano?64:43}" rx="3" fill="#152630" stroke="#0c1d27" stroke-width="2"/>
       ${Array.from({length:8},(_,i)=>`<path d="M${(nano?103:82)+i*(nano?8:14)} ${y-13}v6 M${(nano?103:82)+i*(nano?8:14)} ${y+(nano?57:36)}v6" stroke="#bac6c9" stroke-width="3"/>`).join('')}
       <circle cx="${nano?104:82}" cy="${y+1}" r="2" fill="#89979f"/>
-      <text x="130" y="${y+20}" text-anchor="middle" fill="#7e929c" font-family="monospace" font-size="${nano?7:9}">ATmega328P</text>
+      <text x="130" y="${y+20}" text-anchor="middle" fill="#7e929c" font-family="monospace" font-size="${nano?7:9}">${identity === 'nano-unspecified' ? '' : 'ATmega328P'}</text>
       <rect x="110" y="${y+76}" width="36" height="12" rx="5" fill="url(#metal)" stroke="#8aa8ae"/>
       ${nano?'':`<circle cx="68" cy="${y+73}" r="10" fill="#273e46" stroke="#a8b5b7" stroke-width="3"/><path d="M63 ${y+73}h10" stroke="#a8b5b7"/>`}
       <rect x="${nano?103:166}" y="${height-53}" width="20" height="16" rx="2" fill="#b7c4c4"/><rect x="${nano?108:171}" y="${height-49}" width="10" height="8" fill="#913e3e"/>

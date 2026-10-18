@@ -1,4 +1,4 @@
-import { escapeHtml as esc, pinName, type Circuit, type Component } from './types.ts';
+import { boardIdentity, escapeHtml as esc, pinName, type Circuit, type Component } from './types.ts';
 
 export interface BoardPort { pin: string; label: string; x: number; y: number; side: 'left' | 'right'; connected: boolean }
 export interface BoardDrawing { width: number; height: number; image: string; ports: Map<string, BoardPort> }
@@ -27,7 +27,8 @@ export function boardDrawing(circuit: Circuit, component: Component): BoardDrawi
     group.forEach((p, i) => ports.set(p.pin, { ...p, x: side === 'left' ? 22 : width-22, y: 93+i*27,
       side, connected: active.has(p.pin) }));
   }
-  const nano = component.libsource.part === 'Arduino_Nano_v3.x';
+  const identity = boardIdentity(component);
+  const nano = identity === 'nano' || identity === 'nano-unspecified';
   const sockets = [...ports.values()].map(p => {
     const duplicate = pins.filter(other => other.label === p.label).length > 1;
     const textX = p.side === 'left' ? p.x+18 : p.x-18;
@@ -41,10 +42,10 @@ export function boardDrawing(circuit: Circuit, component: Component): BoardDrawi
     <rect x="161" y="1" width="98" height="54" rx="5" fill="url(#usb)" stroke="#647e8c" stroke-width="2"/><rect x="179" y="8" width="62" height="25" rx="2" fill="#526773"/><rect x="188" y="15" width="44" height="10" fill="#bac8ce"/>
     <g font-family="Arial,sans-serif">${sockets}
       <text x="210" y="${height/2-40}" text-anchor="middle" font-size="21" font-weight="700" fill="#e1f2f5">ARDUINO</text>
-      <text x="210" y="${height/2-17}" text-anchor="middle" font-size="14" fill="#b5d7dd">${nano?'CLASSIC NANO':'UNO R3'}</text>
+      <text x="210" y="${height/2-17}" text-anchor="middle" font-size="14" fill="#b5d7dd">${identity === 'nano-unspecified' ? 'NANO' : nano ? 'CLASSIC NANO' : 'UNO R3'}</text>
       <rect x="177" y="${height/2+9}" width="66" height="95" rx="4" fill="#122b36" stroke="#547987"/>
       ${Array.from({length:8},(_,i)=>`<path d="M169 ${height/2+19+i*10}h8 M243 ${height/2+19+i*10}h8" stroke="#a7bbc3" stroke-width="3"/>`).join('')}
-      <text x="210" y="${height/2+62}" text-anchor="middle" font-family="monospace" font-size="8" fill="#8ea9b5">ATmega328P</text>
+      <text x="210" y="${height/2+62}" text-anchor="middle" font-family="monospace" font-size="8" fill="#8ea9b5">${identity === 'nano-unspecified' ? '' : 'ATmega328P'}</text>
       <text x="210" y="${height-36}" text-anchor="middle" font-size="11" fill="#a9cbd3">PIN MAP · NOT TO SCALE</text>
       <circle cx="123" cy="${height-35}" r="4" fill="#ffdc7b"/>
     </g></svg>`;

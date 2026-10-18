@@ -44,6 +44,22 @@ class ChatTests(unittest.TestCase):
         self.addCleanup(self.key.stop)
         self.store = store_fixture()
 
+    def test_pin_labels_keep_ids_separate_and_leave_conflicts_unresolved(self):
+        pins = [
+            {'ref': 'CTRL', 'pin': '16', 'name': 'D13', 'pinfunction': 'D13_16'},
+            {'ref': 'CTRL', 'pin': '17', 'name': 'unknown', 'pinfunction': 'unknown'},
+            {'ref': 'PART', 'pin': '2', 'name': 'VCC', 'pinfunction': 'GND'},
+            {'ref': 'PART', 'pin': '9', 'name': 'SDA', 'pinfunction': 'SDA'},
+        ]
+        self.assertEqual([p['display_label'] for p in chat.pin_labels(pins)], ['D13', 'pin 17', 'pin 2', 'SDA'])
+        self.assertEqual(chat.pin_labels(pins)[2]['conflicting_labels'], ['VCC', 'GND'])
+        self.store.review_facts.return_value['pins'] = pins
+        with patch('circuitdoctor.chat.check_rules', return_value={}), patch('circuitdoctor.chat.generate', return_value=reply([{'text': 'D13 connects onward [E0].'}])) as generate:
+            chat.ask_circuit(self.store, CID, 'Explain the pins')
+        initial = generate.call_args.args[0]['contents'][0]['parts'][0]['text']
+        self.assertIn('"exported_pin_id": "16", "display_label": "D13"', initial)
+        self.assertEqual(self.store.review_facts.return_value['pins'][0]['pin'], '16')
+
     def test_loop_preserves_signature_and_returns_real_evidence(self):
         content = reply([{'functionCall': {'name': 'explain_net', 'args': {'ref': 'A1', 'pin': '28'}, 'id': 'call-1'}, 'thoughtSignature': 'test-signature'}])
         with patch('circuitdoctor.chat.generate', side_effect=[content, reply([{'text': 'D13 is on signal [E2].'}])]) as generate:

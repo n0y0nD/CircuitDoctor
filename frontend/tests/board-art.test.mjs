@@ -54,3 +54,21 @@ test('missing library metadata retains actual exported pins without inventing Ar
   circuit.nets[0].nodes.pop();
   assert.equal(boardDrawing(circuit, component).ports.get('007').connected, false);
 });
+
+ test('unspecified Nano uses imported labels without asserting Classic Nano specifications', async () => {
+  const { componentKind, boardLabel } = await import('../src/types.ts');
+  const { component, circuit } = fixture('Arduino_Nano');
+  circuit.libparts = [];
+  circuit.nets[0].nodes[0].pin = '16';
+  const board = boardDrawing(circuit, component);
+  const svg = decodeURIComponent(board.image.split(',')[1]);
+  assert.equal(componentKind(component), 'board');
+  assert.equal(boardLabel(component), 'Arduino Nano (version unspecified)');
+  assert.equal(board.ports.get('16').label, 'D13');
+  assert.equal(board.ports.size, 4);
+  assert.ok(svg.includes('>NANO<'));
+  assert.ok(!svg.includes('CLASSIC NANO'));
+  assert.ok(!svg.includes('ATmega328P'));
+  assert.equal(componentKind({ ...component, libsource: { lib: 'Custom', part: 'Arduino_Nano' } }), 'component');
+  assert.equal(componentKind({ ...component, libsource: { lib: 'MCU_Module', part: 'Arduino_Nano_Every' } }), 'component');
+});

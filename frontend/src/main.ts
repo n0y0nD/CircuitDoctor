@@ -10,6 +10,7 @@ import { ExplanationRequest, singleEvidencePin, type ExplanationState } from "./
 import { ReviewRequest, type ReviewState, type Finding } from "./review";
 import {
   componentKind,
+  boardLabel,
   connectionLabel,
   endpointLabel,
   visibleNets,
@@ -241,7 +242,7 @@ function renderCircuit() {
   $("#replace-file").hidden = false;
   const boards = circuit.components.filter((c) => componentKind(c) === "board");
   const board = boards.length === 1
-    ? (boards[0].libsource.part || boards[0].value) === "Arduino_UNO_R3" ? "Arduino Uno R3" : "Classic Nano"
+    ? boardLabel(boards[0])
     : boards.length > 1 ? `${boards.length} Arduino boards` : "Board not identified";
   $("#circuit-title").textContent = filename;
   $("#circuit-summary").textContent = `${board} · ${circuit.components.length} components · ${circuit.nets.filter(n => n.nodes.length > 1).length} connections`;

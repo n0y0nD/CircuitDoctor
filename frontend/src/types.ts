@@ -53,11 +53,28 @@ export const escapeHtml = (value: unknown) =>
 export const isUnused = (net: Net) =>
   net.nodes.every((pin) => pin.pintype.split("+").includes("no_connect"));
 
+// Display identity is separate from the backend's verified electrical catalog.
+export function boardIdentity(component: Component): 'uno' | 'nano' | 'nano-unspecified' | null {
+  if (component.libsource.lib !== 'MCU_Module') return null;
+  switch (component.libsource.part) {
+    case 'Arduino_UNO_R3': return 'uno';
+    case 'Arduino_Nano_v3.x': return 'nano';
+    case 'Arduino_Nano': return 'nano-unspecified';
+    default: return null;
+  }
+}
+
+export function boardLabel(component: Component): string {
+  const board = boardIdentity(component);
+  return board === 'uno' ? 'Arduino Uno R3' : board === 'nano' ? 'Classic Nano'
+    : board === 'nano-unspecified' ? 'Arduino Nano (version unspecified)' : 'Board not identified';
+}
+
 export function componentKind(
   component: Component,
 ): "board" | "resistor" | "led" | "oled" | "lcd" | "diode" | "battery" | "capacitor" | "ground" | "component" {
   const part = component.libsource.part || component.value;
-  if (["Arduino_UNO_R3", "Arduino_Nano_v3.x"].includes(part)) return "board";
+  if (boardIdentity(component)) return "board";
   if (part === "R" || part === "R_Small") return "resistor";
   if (part === "LED" || part.startsWith("LED_")) return "led";
   const lib = component.libsource.lib;

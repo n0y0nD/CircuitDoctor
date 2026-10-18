@@ -22,6 +22,7 @@ class CatalogTests(unittest.TestCase):
         self.assertIsNone(identify({'value':'Arduino_UNO_R3'}))
         self.assertIsNone(identify({'libsource':{'lib':'Custom', 'part':'Arduino_UNO_R3'}}))
         self.assertIsNone(identify({'libsource':{'lib':'MCU_Module', 'part':'Arduino_Nano_Every'}}))
+        self.assertIsNone(identify({'libsource':{'lib':'MCU_Module', 'part':'Arduino_Nano'}}))
         self.assertEqual(len(catalog()['parts']), 2)
 
     def test_ambiguous_pin_metadata_is_not_overridden(self):
