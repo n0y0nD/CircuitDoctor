@@ -12,9 +12,9 @@ const labels: Record<string, string> = {
 
 // Present only information useful for exploring the circuit. Raw responses and
 // database queries stay out of the rendered page, including for future tools.
-export function renderChatEvidence(items: ChatEvidence[], turn: number): string {
+export function renderChatEvidence(items: ChatEvidence[], turn: number, summary = 'Connections behind this answer'): string {
   if (!items.length) return '';
-  return `<details class="chat-evidence"><summary>Connections behind this answer</summary>${items.map((item, index) => {
+  return `<details class="chat-evidence"><summary>${summary}</summary>${items.map((item, index) => {
     const label = labels[item.tool] || 'Circuit connections';
     const allFindings = item.result.findings || [];
     const findings = allFindings.map((finding, index) => ({ finding, index }))

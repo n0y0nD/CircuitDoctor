@@ -250,6 +250,10 @@ export class CircuitGraph {
         {selector:'node[kind = "pin"].issue',style:{width:10,height:10,'background-color':'#f5d580','border-width':2.5,'border-color':'#D4362A'}},
         {selector:'node[kind = "net"].issue',style:{'background-color':'#D4362A',width:9,height:9,'border-width':0}},
         {selector:'edge.issue',style:{width:3,'line-color':'#D4362A','underlay-color':'#D4362A','underlay-opacity':0.13,'underlay-padding':6,'z-index':7}},
+        // Wires that changed between two uploads are green.
+        {selector:'node[kind = "pin"].change',style:{'border-color':'#2F7D4C','border-width':2.5}},
+        {selector:'node[kind = "net"].change',style:{'background-color':'#2F7D4C'}},
+        {selector:'edge.change',style:{'line-color':'#2F7D4C',width:3.5}},
         {selector:'node.tagged',style:{label:'data(tag)','font-family':'"JetBrains Mono Variable", "JetBrains Mono", monospace','font-size':12,'font-weight':600,color:'#1D1C1A',
           'text-background-color':'#F6F4EF','text-background-opacity':1,'text-background-padding':'3px','text-background-shape':'roundrectangle','text-margin-y':-12,'z-index':12}},
         {selector:'node.tagged.tag-red',style:{color:'#ffffff','text-background-color':'#D4362A'}},
@@ -371,12 +375,12 @@ export class CircuitGraph {
   }
   clearFocus() {
     this.setProbes(null);
-    this.cy.elements().removeClass('active connected selection-muted evidence evidence-muted issue');
+    this.cy.elements().removeClass('active connected selection-muted evidence evidence-muted issue change');
     this.focusStatus.hidden = true;
     this.fit();
   }
-  highlightEvidence(result: Pick<Explanation, 'evidence'> | null, mode: 'route' | 'issue' = 'route', label = '') {
-    this.cy.elements().removeClass('evidence evidence-muted issue');
+  highlightEvidence(result: Pick<Explanation, 'evidence'> | null, mode: 'route' | 'issue' | 'change' = 'route', label = '') {
+    this.cy.elements().removeClass('evidence evidence-muted issue change');
     if (!result) return;
     this.cy.elements().removeClass('active connected selection-muted');
     const ids = new Set(result.evidence.nodes.map(n => n.id));
@@ -391,6 +395,7 @@ export class CircuitGraph {
     const refs = new Set(this.cy.nodes().filter(n=>ids.has(n.id()) && n.data('kind')==='pin').map(n=>n.data('ref')));
     this.cy.nodes().filter(n=>n.data('kind')==='component' && refs.has(n.data('ref'))).removeClass('evidence-muted');
     if(mode==='issue') this.cy.elements('.evidence').addClass('issue');
+    if(mode==='change') this.cy.elements('.evidence').addClass('change');
     this.setFocusLabel(label || (mode==='issue' ? 'Showing · the problem in red' : 'Showing · the route in dark ink'));
     const focus = this.cy.nodes().filter(n=>ids.has(n.id()) || (n.data('kind')==='component' && refs.has(n.data('ref'))));
     if(focus.length) { this.cy.fit(focus,70); if(this.cy.zoom()>1.2) this.cy.zoom(1.2); }

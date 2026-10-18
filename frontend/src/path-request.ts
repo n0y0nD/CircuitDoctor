@@ -24,6 +24,7 @@ export function pathPins(circuit: Circuit) {
     }
     return [...pins].map(([pin, name]) => ({
       value: JSON.stringify([component.ref, pin]), ref: component.ref, pin,
+      name: name && !['unknown', '~'].includes(name) ? name : '',
       label: `${component.ref} · ${component.value.replaceAll('_', ' ')} · ${name && !['unknown', '~'].includes(name) ? name + ' · ' : ''}pin ${pin}`,
     }));
   });

@@ -2,10 +2,11 @@ import "@fontsource-variable/bricolage-grotesque/standard.css";
 import "@fontsource-variable/jetbrains-mono";
 import "./style.css";
 import probeSymbols from "./assets/probe-symbols.svg?raw";
-import { meterHtml, reviewReading, type Reading } from "./meter";
-import { VerifyPanel } from "./verify-panel";
+import { meterHtml, reviewReading, traceReading, type Reading } from "./meter";
+import { VerifyPanel, isFixed } from "./verify-panel";
+import type { Comparison } from "./verify-fix";
 import { comparisonFromHash, circuitHash } from "./verify-fix";
-import { PathPanel } from "./path-panel";
+import { PathPanel, type TracedRoute } from "./path-panel";
 import type { ChatComparison } from "./chat";
 import { ChatPanel } from "./chat-panel";
 import type { Explanation } from "./explanation";
@@ -50,6 +51,9 @@ const reviewRequest = new ReviewRequest();
 let review: ReviewState = { status: "idle" };
 let selectedFinding: Finding | null = null;
 let chatEvidence: Pick<Explanation, "evidence"> | null = null;
+let evidenceLabel = "";
+let evidenceKind: "" | "chat" | "trace" | "compare" = "";
+let traceRoute: TracedRoute | null = null;
 
 function clearReview() {
   reviewRequest.cancel();
@@ -97,6 +101,7 @@ $("#app").innerHTML = `
   ${loadingHtml()}
   <section class="workspace" id="circuit-section" aria-label="Your uploaded circuit" hidden>
     <div class="col">
+      <div class="strip" id="review-strip"></div>
       <section class="panel problems" id="review-panel" aria-label="Wiring check"><div id="review-results" aria-live="polite"></div></section>
       <section id="path-panel" class="panel side-panel" aria-label="Trace a connection" hidden></section>
       <section id="verify-panel" class="panel side-panel" aria-label="Check an updated file" hidden></section>
@@ -125,10 +130,12 @@ $("#app").innerHTML = `
 <div class="drop-overlay" id="drop-overlay" hidden>${icon("upload", 32)}<strong>Drop your .net file</strong></div>
 ${helpDialogHtml()}`;
 
-function showEvidence(evidence: Explanation["evidence"] | null, reveal = false) {
+function showEvidence(evidence: Explanation["evidence"] | null, reveal = false, label = "", kind: typeof evidenceKind = "chat") {
   clearExplanation();
   selectedFinding = null;
   chatEvidence = evidence ? { evidence } : null;
+  evidenceLabel = label;
+  evidenceKind = evidence ? kind : "";
   if (!evidence) { renderInspector(); return; }
   view = "graph";
   query = "";
@@ -145,19 +152,78 @@ function showEvidence(evidence: Explanation["evidence"] | null, reveal = false) 
   if (reveal) $(".explorer-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 let activeComparison: ChatComparison | null = null;
-const chatPanel = new ChatPanel($("#chat-panel"), evidence => {
-  showEvidence(evidence);
+const chatPanel = new ChatPanel($("#chat-panel"), (evidence, label) => {
+  showEvidence(evidence, false, label || "Showing · from chat");
   $(".explorer-panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
-});
+}, focused => setChatFocus(focused));
+// While chatting, the problem collapses to a one-line strip so the conversation gets the room.
+function setChatFocus(focused: boolean) {
+  $("#circuit-section").classList.toggle("chat-focus", focused && chatPanel.hasConversation);
+}
 const verifyPanel = new VerifyPanel($("#verify-panel"), async (id, evidence) => {
   if (circuit?.storage.circuit_id !== id) await readCircuit(`/api/circuits/${encodeURIComponent(id)}`, "saved circuit", {}, true, false);
-  if (circuit?.storage.circuit_id === id) showEvidence(evidence, true);
+  if (circuit?.storage.circuit_id !== id) return;
+  verifyPanel.setViewing(id);
+  if (evidence) showEvidence(evidence, true, "Showing · wiring from the comparison", "compare");
+  else showChanges();
 }, $("#open-verify"), result => {
   activeComparison = result ? { original_id: result.original_id, corrected_id: result.corrected_id } : null;
   chatPanel.setComparison(activeComparison);
   if (circuit) history.replaceState(null, "", circuitHash(circuit.storage.circuit_id, activeComparison));
+  if (result) showChanges();
+  else if (evidenceKind === "compare") showEvidence(null);
+  renderReview();
+}, () => {
+  // Closing the comparison returns the drawing to the problem view.
+  if (!verifyPanel.isOpen && evidenceKind === "compare") {
+    const first = review.status === "success" ? groupFindings(review.result).problems[0] : null;
+    if (first) showFinding(expandedFinding || first.id, false); else showEvidence(null);
+  }
+  renderReview();
 });
-const pathPanel = new PathPanel($("#path-panel"), showEvidence);
+// Green marks the wires that changed between the two files: added ones on the
+// updated circuit, removed ones on the earlier circuit.
+function changeEvidence(result: Comparison, viewingUpdated: boolean): Explanation["evidence"] {
+  const wanted = result.connections.filter(c => c.status === (viewingUpdated ? "added" : "removed"));
+  const nodes = new Map(wanted.flatMap(c => c.evidence.nodes).map(n => [n.id, { id: n.id, kind: n.kind }]));
+  return { nodes: [...nodes.values()], edges: wanted.flatMap(c => c.evidence.edges), paths: [] };
+}
+function showChanges() {
+  const result = verifyPanel.comparison;
+  if (!result || !circuit) return;
+  const evidence = changeEvidence(result, circuit.storage.circuit_id === result.corrected_id);
+  if (evidence.nodes.length) showEvidence(evidence, false, "Showing · what changed", "compare");
+}
+const pathPanel = new PathPanel($("#path-panel"),
+  (evidence, reveal) => showEvidence(evidence, reveal, evidence ? "Showing · traced route" : "", "trace"),
+  route => {
+    traceRoute = route;
+    meterOverride = route ? traceReading(route.steps, route.from.name, `${route.to.ref}·${/^Pin \d/.test(route.to.name) ? route.to.pin : route.to.name}`) : null;
+    renderMeter();
+    renderKey();
+    chatPanel.setSuggestions(chatSuggestions());
+  });
+function traceOpen() { return $("#circuit-section").classList.contains("trace-open"); }
+function openTrace() {
+  setChatFocus(false);
+  $("#circuit-section").classList.add("trace-open");
+  // Start from the shown fault's red-probe pin, if there is one.
+  const ends = selectedFinding ? faultEnds(selectedFinding) : null;
+  if (ends) pathPanel.preset(ends[0]);
+  renderReview();
+  $("#path-panel").scrollIntoView({ block: "nearest" });
+  $("#path-panel").querySelector<HTMLElement>("select")?.focus();
+}
+function closeTrace() {
+  if (!traceOpen()) return;
+  $("#circuit-section").classList.remove("trace-open");
+  traceRoute = null;
+  meterOverride = null;
+  const first = review.status === "success" ? groupFindings(review.result).problems[0] : null;
+  if (first) showFinding(expandedFinding || first.id, false);
+  else showEvidence(null);
+  renderReview();
+}
 
 function connectionState(online: boolean) {
   const element = $("#connection-status");
@@ -281,7 +347,7 @@ async function readCircuit(
     clearReview();
     circuit = result;
     if (!keepComparison) verifyPanel.setCircuit(result);
-    chatPanel.setCircuit(result.storage.circuit_id);
+    chatPanel.setCircuit(result.storage.circuit_id, result);
     chatPanel.setComparison(activeComparison);
     pathPanel.setCircuit(result);
     filename = result.storage.filename || name;
@@ -309,7 +375,7 @@ async function readCircuit(
       setScreen("workspace");
       notice(`${message} Your previous circuit is still displayed.`);
       if (!keepComparison) verifyPanel.setCircuit(circuit);
-      chatPanel.setCircuit(circuit.storage.circuit_id); chatPanel.setComparison(activeComparison); pathPanel.setCircuit(circuit);
+      chatPanel.setCircuit(circuit.storage.circuit_id, circuit); chatPanel.setComparison(activeComparison); pathPanel.setCircuit(circuit);
       renderCircuit();
     } else {
       setScreen("landing");
@@ -410,14 +476,16 @@ function renderView() {
     );
     graph.select(selection);
     graph.search(query);
-    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null), selectedFinding ? "issue" : "route", focusLabel());
+    graph.highlightEvidence(chatEvidence || selectedFinding || (explanation.status === "success" ? explanation.result : null), selectedFinding ? "issue" : evidenceKind === "compare" ? "change" : "route", focusLabel());
     graph.setProbes(probeTargets());
   } else renderList();
+  renderKey();
   const shown = visibleNets(circuit, showUnused, selection).length;
   $("#graph-summary").textContent =
     `${circuit.components.length} components · ${shown} connections in view`;
 }
 function focusLabel() {
+  if (chatEvidence) return evidenceLabel ? (evidenceLabel.startsWith("Showing") ? evidenceLabel : `Showing · ${evidenceLabel}`) : "";
   if (!selectedFinding || review.status !== "success") return "";
   const problems = groupFindings(review.result).problems;
   const n = problems.indexOf(selectedFinding);
@@ -425,6 +493,7 @@ function focusLabel() {
 }
 // Probes touch the two ends of the shown fault: the first rail pin (red) and the first ground pin (black).
 function probeTargets(): ProbeTargets | null {
+  if (traceRoute && evidenceKind === "trace") return { red: graphPinId(traceRoute.from.ref, traceRoute.from.pin), black: graphPinId(traceRoute.to.ref, traceRoute.to.pin) };
   if (!selectedFinding || review.status !== "success") return null;
   const problems = groupFindings(review.result).problems;
   const markers = problems.filter(p => p !== selectedFinding && problems.includes(selectedFinding!)).map(p => ({
@@ -436,15 +505,58 @@ function probeTargets(): ProbeTargets | null {
     .map(spec => ({ id: graphPinId(spec.ref, spec.pin), text: pinWord(spec), tone: spec.role === "rail" && ends?.[0] === spec ? "red" as const : "ink" as const }));
   return ends ? { red: graphPinId(ends[0].ref, ends[0].pin), black: graphPinId(ends[1].ref, ends[1].pin), tags, markers } : { markers };
 }
+// Pins on the problem currently shown, so the parts list can point at it.
+function problemPins(): Set<string> {
+  const finding = review.status === "success" ? groupFindings(review.result).problems.find(p => p.id === expandedFinding) || groupFindings(review.result).problems[0] : null;
+  return new Set(finding ? finding.evidence.nodes.filter(n => n.kind === "pin").map(n => n.id) : []);
+}
+function componentsHtml(filter: string) {
+  const c = circuit!;
+  const faulty = problemPins();
+  const shortShown = review.status === "success" && groupFindings(review.result).problems.some(p => p.rule === "power_ground_short");
+  const faultWord = shortShown ? "the short" : "the problem";
+  const list = c.components.filter(part => `${part.ref} ${part.value} ${part.libsource.part}`.toLowerCase().includes(filter));
+  const wires = c.nets.filter(net => net.nodes.length > 1);
+  const pinsOf = (ref: string) => {
+    const library = c.libparts.find(p => p.lib === c.components.find(x => x.ref === ref)?.libsource.lib && p.part === c.components.find(x => x.ref === ref)?.libsource.part);
+    const used = new Set(c.nets.flatMap(n => n.nodes.filter(p => p.ref === ref).map(p => p.pin)));
+    return Math.max(library?.pins.length || 0, used.size);
+  };
+  const connectedOf = (ref: string) => new Set(wires.flatMap(n => n.nodes.filter(p => p.ref === ref).map(p => p.pin))).size;
+  const onFault = (ref: string) => [...faulty].filter(id => id.startsWith(`p:${JSON.stringify([ref]).slice(0, -1)},`)).length;
+  const chosen = selection?.kind === "component" ? selection.id : (c.components.find(part => componentKind(part) === "board") || c.components[0])?.ref;
+  const rows = list.map(part => {
+    const total = pinsOf(part.ref), connected = connectedOf(part.ref), hits = onFault(part.ref);
+    return `<tr class="${part.ref === chosen ? "sel" : ""}" data-component="${esc(part.ref)}" tabindex="0"><td class="ref">${esc(part.ref)}</td><td>${esc(displayValue(part))}${componentKind(part) === "board" && boardLabel(part).toLowerCase() !== displayValue(part).toLowerCase() ? `<span class="sub">${esc(boardLabel(part))}</span>` : ""}${hits ? `<span class="flt"><i></i>${hits} pin${hits === 1 ? "" : "s"} on ${faultWord}</span>` : ""}</td><td class="n"><b>${total}</b></td><td class="n"><span class="bar"><s style="width:${total ? Math.round(connected / total * 100) : 0}%"></s></span><b>${connected}</b></td><td class="go" aria-hidden="true">▸</td></tr>`;
+  }).join("");
+  const wireRows = wires.map(net => {
+    const bad = net.nodes.some(p => faulty.has(graphPinId(p.ref, p.pin)));
+    const two = net.nodes.length === 2 ? net.nodes.map(p => `${p.ref}·${pinName(c, p)}`).join(" ↔ ") : "";
+    return `<button type="button" class="wr" data-net="${esc(net.code)}"><span class="d${bad ? "" : " g"}"></span><span class="nm">${esc(netLabel(net))} wire</span><span class="m">net ${esc(net.name)} · ${net.nodes.length} pins</span><span class="r${bad ? " f" : ""}">${bad ? faultWord : esc(two)}</span></button>`;
+  }).join("");
+  const part = c.components.find(x => x.ref === chosen);
+  let side = "";
+  if (part) {
+    const memberships = c.nets.flatMap(net => net.nodes.filter(p => p.ref === part.ref).map(pin => ({ net, pin })));
+    const shown = memberships.filter(m => m.net.nodes.length > 1);
+    const hits = shown.filter(m => faulty.has(graphPinId(m.pin.ref, m.pin.pin))).length;
+    const total = pinsOf(part.ref);
+    side = `<aside class="pins"><div class="who"><b>${esc(part.ref)}</b><h3>${esc(componentKind(part) === "board" ? boardLabel(part) : displayValue(part))}</h3><span class="meta">${shown.length} of ${total} pins</span></div>
+      <p class="say">${hits ? `${hits === shown.length ? `All ${hits}` : hits} connected pin${hits === 1 ? "" : "s"} ${hits === 1 ? "is" : "are"} on <em>${faultWord === "the short" ? "the shorted wire" : "the problem wire"}</em>.` : `${shown.length} pin${shown.length === 1 ? "" : "s"} connected to other parts.`}</p>
+      <div class="plist">${shown.map(({ net, pin }) => `<button type="button" class="pr" data-pin-ref="${esc(pin.ref)}" data-pin="${esc(pin.pin)}"><span class="d${faulty.has(graphPinId(pin.ref, pin.pin)) ? "" : " g"}"></span><span class="pn">${esc(pinName(c, pin).replace(/^\+/, ""))}<small>pin ${esc(pin.pin)}</small></span><span class="w"><span class="ar">→</span>${esc(netLabel(net))} wire<small>shared with ${net.nodes.length - 1} pin${net.nodes.length === 2 ? "" : "s"} · <span class="mono">net ${esc(net.name)}</span></small></span></button>`).join("")}
+        ${total - shown.length > 0 ? `<button type="button" class="unused" data-toggle-unused><i></i>${total - shown.length} unused pin${total - shown.length === 1 ? "" : "s"}<span class="chev">▸</span></button>` : ""}</div>
+      <button type="button" class="btn" data-show-part="${esc(part.ref)}">${sym("i-target")}Show on the drawing</button></aside>`;
+  }
+  return `<div class="parts"><div class="tbl"><div class="hd"><h3>Parts in your file</h3><span class="meta">${c.components.length} part${c.components.length === 1 ? "" : "s"} · ${wires.length} wire${wires.length === 1 ? "" : "s"}</span><span class="hint">Click a part to see its pins</span></div>
+    <table><thead><tr><th>Part</th><th>What it is</th><th class="n">Pins</th><th class="n">Connected</th><th></th></tr></thead><tbody>${rows}</tbody></table>${!list.length ? '<div class="no-results">No parts match your search.</div>' : ""}
+    <div class="wire-list"><div class="hd"><h3>Wires</h3><button type="button" class="link-button" data-view="nets">All connections ▸</button></div>${wireRows}</div>
+    <p class="tnote">${'<svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="6" cy="6" r="5"/><path d="M6 5.5v3M6 3.4v.2"/></svg>'}Parts and pins come straight from your .net file.</p></div>${side}</div>`;
+}
 function renderList() {
   if (!circuit) return;
   const filter = query.toLowerCase();
   if (view === "components") {
-    const list = circuit.components.filter((c) =>
-      `${c.ref} ${c.value} ${c.libsource.part}`.toLowerCase().includes(filter),
-    );
-    $("#list-view").innerHTML =
-      `<div class="table-caption">${list.length} component${list.length === 1 ? "" : "s"} in this view</div><table><thead><tr><th>Reference</th><th>Component</th><th></th></tr></thead><tbody>${list.map((c) => `<tr class="${selection?.kind === "component" && selection.id === c.ref ? "selected-row" : ""}"><td><button class="reference-button" data-component="${esc(c.ref)}">${esc(c.ref)}</button></td><td>${esc(displayValue(c))}</td><td><button class="icon-button" data-component="${esc(c.ref)}" aria-label="Inspect ${esc(c.ref)}">${icon("chevron", 15)}</button></td></tr>`).join("")}</tbody></table>${!list.length ? '<div class="no-results">No components match your search.</div>' : ""}`;
+    $("#list-view").innerHTML = componentsHtml(filter);
   } else {
     const nets = visibleNets(circuit, showUnused, selection).filter(
       (n) =>
@@ -458,7 +570,7 @@ function renderList() {
 }
 function renderInspector() {
   // The problems panel explains findings; the drawer is for things picked on the canvas or in a list.
-  $("#inspector").hidden = !circuit || !selection || !!selectedFinding;
+  $("#inspector").hidden = !circuit || !selection || !!selectedFinding || !!chatEvidence || view === "components";
   const findingPanel = $("#selected-finding");
   findingPanel.hidden = !selectedFinding;
   findingPanel.innerHTML = selectedFinding ? `<div class="finding-detail ${selectedFinding.severity}"><span class="finding-severity">${selectedFinding.severity === "warning" ? "Check this connection" : "Information"}</span><h3>${esc(selectedFinding.title)}</h3><p>${esc(selectedFinding.message)}</p><p><strong>What to check:</strong> ${esc(selectedFinding.suggestion)}</p>${sourceLinks(selectedFinding.sources || [])}</div>` : "";
@@ -532,6 +644,8 @@ function fixSteps(done: boolean) {
 }
 function renderKey() {
   const key = $("#canvas-key");
+  if (evidenceKind === "compare") { key.innerHTML = '<s class="swatch green"></s>Green = what changed'; return; }
+  if (traceOpen()) { key.innerHTML = traceRoute ? '<s class="swatch ink"></s>Dark = the traced route' : ""; return; }
   if (review.status !== "success") { key.innerHTML = ""; return; }
   const { problems } = groupFindings(review.result);
   if (problems.length) {
@@ -541,6 +655,34 @@ function renderKey() {
   } else if (!boardRecognized(review.result)) key.innerHTML = '<i class="kdot grey"></i>Board checks skipped';
   else key.innerHTML = '<i class="kdot green"></i>Nothing to flag';
 }
+function reviewStripHtml() {
+  if (review.status !== "success") return `<span class="txt">${review.status === "loading" ? "Checking your circuit…" : "Wiring check"}</span><button class="exp" type="button" data-chat-back aria-label="Show the summary">▾</button>`;
+  const { problems } = groupFindings(review.result);
+  const first = problems.find(p => p.id === expandedFinding) || problems[0];
+  if (first) {
+    const ends = faultEnds(first);
+    const what = first.rule === "power_ground_short" && ends ? `${pinWord(ends[0])} connected to ${pinWord(ends[1])}` : first.title;
+    return `<span class="cnt">!</span><b>${problems.length} problem${problems.length === 1 ? "" : "s"}</b><i class="dot"></i><span class="txt">${esc(what)}</span><button class="btn sm" type="button" data-finding="${esc(first.id)}">${sym("i-target")}Show me</button><button class="exp" type="button" data-chat-back aria-label="Show the summary">▾</button>`;
+  }
+  return `${boardRecognized(review.result) ? `<span class="ok-dot">${sym("i-check")}</span><b>No wiring problems</b>` : '<b>Board not recognized</b>'}<span class="txt"></span><button class="exp" type="button" data-chat-back aria-label="Show the summary">▾</button>`;
+}
+// Suggested questions name real parts from this file only.
+function chatSuggestions(): string[] {
+  if (!circuit) return [];
+  const part = circuit.components.find(c => componentKind(c) !== "board" && componentKind(c) !== "ground");
+  const whatIs = part ? `What is ${part.ref}?` : "Which parts are connected?";
+  if (activeComparison) return ["What exactly changed?", "Is the fix complete?"];
+  if (traceOpen() && traceRoute) return ["Why are these two joined?", traceRoute.wires[0] ? `What else is on ${traceRoute.wires[0]}?` : `What is ${traceRoute.to.ref}?`];
+  if (review.status !== "success") return [whatIs];
+  const { problems } = groupFindings(review.result);
+  if (problems.length) {
+    const short = problems.find(p => p.rule === "power_ground_short");
+    const ends = short ? faultEnds(short) : null;
+    return [ends ? `Why is ${pinWord(ends[0])} connected to ${pinWord(ends[1])}?` : `Why is “${problems[0].title}” a problem?`, "How do I fix this in KiCad?", whatIs].slice(0, problems.length > 1 ? 2 : 3);
+  }
+  if (!boardRecognized(review.result)) return [part ? `What is connected to ${circuit.components[0].ref}?` : whatIs, "Which pins are unused?"];
+  return ["What does this circuit do?", whatIs];
+}
 function renderReview() {
   renderMeter();
   const button = $<HTMLButtonElement>("#run-review");
@@ -549,12 +691,25 @@ function renderReview() {
   const problems = review.status === "success" ? groupFindings(review.result).problems : [];
   const clean = review.status === "success" && !problems.length;
   const workspace = document.body.dataset.screen === "workspace";
-  button.hidden = !workspace || clean;
-  $("#replace-file").hidden = !workspace || !clean || !(review.status === "success" && boardRecognized(review.result));
-  $("#fix-steps").hidden = !problems.length;
-  $("#fix-steps").innerHTML = problems.length ? fixSteps(false) : "";
+  const tracing = traceOpen();
+  const comparison = verifyPanel.comparison;
+  const comparing = !!comparison && verifyPanel.isOpen;
+  $("#circuit-section").classList.toggle("compare-done", comparing);
+  if (circuit) verifyPanel.setViewing(circuit.storage.circuit_id);
+  const names = verifyPanel.names;
+  $("#topbar-filename").innerHTML = comparing ? `<span class="old">${esc(names.before)}</span> <span class="arr">→</span> ${esc(names.after)}` : esc(filename);
+  meterOverride = traceRoute ? meterOverride : comparing && isFixed(comparison!) ? { flag: "PASS", text: `${comparison!.summary.resolved} problem${comparison!.summary.resolved === 1 ? "" : "s"} cleared` } : null;
+  renderMeter();
+  button.hidden = !workspace || clean || tracing || comparing;
+  $("#back-to-problem").hidden = !workspace || !tracing || !problems.length;
+  $("#replace-file").hidden = !workspace || !clean || tracing || comparing || !(review.status === "success" && boardRecognized(review.result));
+  const fixedNow = comparing && isFixed(comparison!);
+  $("#fix-steps").hidden = !(problems.length || fixedNow) || tracing;
+  $("#fix-steps").innerHTML = fixedNow ? fixSteps(true) : problems.length ? fixSteps(false) : "";
   renderKey();
   if (!circuit) { $("#review-results").innerHTML = ""; return; }
+  $("#review-strip").innerHTML = reviewStripHtml();
+  chatPanel.setSuggestions(chatSuggestions());
   const boards = circuit.components.filter(c => componentKind(c) === "board");
   $("#review-results").innerHTML = reviewPanelHtml(review, {
     circuit, expanded: expandedFinding, hiddenPins: hiddenPinCount(), showingUnused: showUnused, checkedAt,
@@ -612,11 +767,11 @@ document.addEventListener("click", (event) => {
   const expand = target.closest<HTMLElement>("[data-expand-finding]");
   if (expand) showFinding(expand.dataset.expandFinding!);
   if (target.closest("[data-toggle-unused]")) setShowUnused(!showUnused);
-  if (target.closest("[data-open-trace]")) {
-    $("#circuit-section").classList.add("trace-open");
-    $("#path-panel").scrollIntoView({ block: "nearest" });
-    $("#path-panel").querySelector<HTMLElement>("summary, select")?.focus();
-  }
+  const showPart = target.closest<HTMLElement>("[data-show-part]");
+  if (showPart) { view = "graph"; renderView(); selectItem({ kind: "component", id: showPart.dataset.showPart! }); }
+  if (target.closest("#review-strip [data-chat-back]")) setChatFocus(false);
+  if (target.closest("[data-open-trace]")) openTrace();
+  if (target.closest("[data-close-trace], #back-to-problem")) closeTrace();
   if (target.closest("#close-inspector")) { selection = null; graph?.select(null); renderInspector(); }
   const menu = $("#more-list");
   if (target.closest("#more-button")) setMenu(menu.hidden !== false);
@@ -635,6 +790,7 @@ document.addEventListener("click", (event) => {
   if (tab) {
     view = tab.dataset.view as View;
     renderView();
+    renderInspector();
   }
   if (target.closest("#show-explained-connection") && explanation.status === "success") {
     view = "graph";
@@ -715,7 +871,9 @@ function setExpanded(expanded: boolean) {
 }
 $("#expand-canvas").onclick = () => setExpanded(!$(".explorer-panel").classList.contains("expanded"));
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape") { setExpanded(false); cancelLoad(); if (!$("#more-list").hidden) { setMenu(false); $("#more-button").focus(); } }
+  const row = (event.target as HTMLElement).closest?.<HTMLElement>("tr[data-component]");
+  if (row && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); row.click(); }
+  if (event.key === "Escape") { setExpanded(false); cancelLoad(); setChatFocus(false); if (!document.querySelector("dialog[open]")) closeTrace(); if (!$("#more-list").hidden) { setMenu(false); $("#more-button").focus(); } }
   // The shortcut shown on the "Choose .net file" button.
   if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "o"
       && document.body.dataset.screen !== "loading" && serviceOnline && !document.querySelector("dialog[open]")) {

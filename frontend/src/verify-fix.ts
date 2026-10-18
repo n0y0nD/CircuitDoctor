@@ -100,30 +100,40 @@ export function connectionRows(connections: Comparison['connections']): number[]
   return [...rows.values()];
 }
 
+const pinLabel = (p: { ref: string; pin: string; name: string; pinfunction: string }) =>
+  `${p.ref} · ${[p.name, p.pinfunction].find(n => n && n !== 'unknown' && n !== '~') || `pin ${p.pin}`}`;
+/** "A7 · GND ×3 ↔ J9 · Pin_2": the pins on one changed wire, repeats folded. */
+export function wireLabel(pins: Comparison['connections'][number]['pins']) {
+  const counts = new Map<string, number>();
+  for (const pin of pins) { const label = pinLabel(pin); counts.set(label, (counts.get(label) || 0) + 1); }
+  return [...counts].map(([label, n]) => n > 1 ? `${label} ×${n}` : label).join(' ↔ ');
+}
+
+const check = '<svg viewBox="0 0 10 10" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 5.2 4.2 7.4 8.2 2.8"/></svg>';
 export function comparisonHtml(r: Comparison): string {
   const names = { resolved: 'Fixed in file', persists: 'Still needs fixing', unverified: 'Needs a closer look', new: 'New issue' };
-  const button = (index: number, side: string, text: string, type='warning') => `<button class="button secondary" data-compare-${type}="${index}" data-side="${side}">${text}</button>`;
-  return `<h3 class="verify-message">${esc(comparisonHeadline(r))}</h3>
-    ${!r.summary.resolved && !r.summary.persists && !r.summary.new && !r.summary.unverified ? '<p>The earlier file had no warnings from the checks we support. You can still see which wires changed below.</p>' : ''}
-    <div class="verify-warnings">${r.warnings.map((w,i) => `<article class="verify-item"><span class="verify-badge ${w.status}">${names[w.status]}</span><h3>${w.status === 'resolved' ? 'Earlier: ' : ''}${esc(w.title)}</h3>
-      <p>${w.status === 'resolved' ? 'This warning cleared when we checked your updated file.' : w.status === 'persists' ? 'This connection still needs attention in the updated file.' : w.status === 'unverified' ? 'The warning disappeared, but we could not confirm the repair. Check whether parts or pin labels changed.' : esc(w.reason)}</p>
+  const icon = { resolved: `<span class="ok-dot">${check}</span>`, persists: '<span class="cnt-dot">!</span>', new: '<span class="cnt-dot">!</span>', unverified: '<span class="minus-dot">?</span>' };
+  const button = (index: number, side: string, text: string, type='warning') => `<button type="button" class="btn sm" data-compare-${type}="${index}" data-side="${side}">${text}</button>`;
+  const added = r.connections.filter(c => c.status === 'added').length, removed = r.connections.length - added;
+  return `${!r.summary.resolved && !r.summary.persists && !r.summary.new && !r.summary.unverified ? '<p class="cons">The earlier file had no warnings from the checks we support. You can still see which wires changed below.</p>' : ''}
+    <div class="rows verify-warnings">${r.warnings.map((w,i) => `<details class="row verify-item"><summary>${icon[w.status]}<span class="rl t">${esc(w.title)}</span><span class="verify-badge ${w.status}">${w.status === 'resolved' ? check : ''}${names[w.status]}</span><span class="chev" aria-hidden="true">▸</span></summary>
+      <div class="row-body"><p>${w.status === 'resolved' ? 'This warning cleared when we checked your updated file.' : w.status === 'persists' ? 'This connection still needs attention in the updated file.' : w.status === 'unverified' ? 'The warning disappeared, but we could not confirm the repair. Check whether parts or pin labels changed.' : esc(w.reason)}</p>
       ${w.status === 'resolved' ? wiringText(w.after) : ''}
-      <div class="verify-actions">${w.before ? button(i,'before','Show old wiring') : ''}${w.after.nodes.length ? button(i,'after','Show updated wiring') : ''}</div></article>`).join('')}</div>
-    ${r.matching.notes.length ? `<details class="verify-changes"><summary>Why some changes need checking</summary>${r.matching.notes.map(n => `<p>${esc(n)}</p>`).join('')}</details>` : ''}
-    <details class="verify-changes"><summary>See which wires changed</summary>
-    ${r.connections.length ? `<div class="verify-table-wrap"><table class="verify-table" aria-label="Wiring changes between files"><thead><tr><th scope="col">Earlier file</th><th scope="col">Updated file</th></tr></thead><tbody>
-    ${connectionRows(r.connections).map(row => `<tr>${(['removed', 'added'] as const).map(status => {
-      const indexes = row.filter(i => r.connections[i].status === status);
-      return `<td>${indexes.length ? indexes.map(i => {
-        const c = r.connections[i];
-        return `<div class="verify-wire-group"><p>${c.pins.map(p => {
-          const label = [p.name,p.pinfunction].find(n => n && n !== 'unknown' && n !== '~');
-          return esc(`${p.ref} · ${label || `pin ${p.pin}`}`);
-        }).join(' ↔ ')}</p>${button(i,status === 'added' ? 'after' : 'before','Show wires','connection')}</div>`;
-      }).join('') : '<p class="verify-empty">This connection was not present.</p>'}</td>`;
-    }).join('')}</tr>`).join('')}</tbody></table></div>` : '<p>The wire connections are unchanged.</p>'}</details>
-    ${r.truncated ? '<p>Showing the first 100 warnings and connection changes.</p>' : ''}
-    <p class="path-scope">These are wiring checks, not a test of the physical circuit.</p>`;
+      <div class="verify-actions">${w.before ? button(i,'before','Show old wiring') : ''}${w.after.nodes.length ? button(i,'after','Show updated wiring') : ''}</div></div></details>`).join('')}
+    ${!r.summary.new ? `<div class="row static"><span class="ok-dot">${check}</span><span class="rl">No new problems</span></div>` : ''}
+    <details class="row verify-changes" open><summary><span class="diff" aria-hidden="true">±</span><span class="rl">Wires that changed</span><span class="meta">${r.connections.length ? `${added} added, ${removed} removed` : 'none'}</span><span class="chev" aria-hidden="true">▸</span></summary>
+      <div class="row-body">${r.connections.length ? `<ul class="wires">${r.connections.map((c, i) => `<li><button type="button" data-compare-connection="${i}" data-side="${c.status === 'added' ? 'after' : 'before'}" title="Show this wire on the ${c.status === 'added' ? 'updated' : 'earlier'} circuit"><span class="${c.status === 'added' ? 'add' : 'rem'}" aria-hidden="true">${c.status === 'added' ? '+' : '−'}</span><span class="k">${c.status}</span><span class="w">${esc(wireLabel(c.pins))}</span></button></li>`).join('')}</ul>
+      <details class="sub"><summary>Side by side</summary><div class="verify-table-wrap"><table class="verify-table" aria-label="Wiring changes between files"><thead><tr><th scope="col">Earlier file</th><th scope="col">Updated file</th></tr></thead><tbody>
+      ${connectionRows(r.connections).map(row => `<tr>${(['removed', 'added'] as const).map(status => {
+        const indexes = row.filter(i => r.connections[i].status === status);
+        return `<td>${indexes.length ? indexes.map(i => {
+          const c = r.connections[i];
+          return `<div class="verify-wire-group"><p>${c.pins.map(p => esc(pinLabel(p))).join(' ↔ ')}</p>${button(i,status === 'added' ? 'after' : 'before','Show wires','connection')}</div>`;
+        }).join('') : '<p class="verify-empty">This connection was not present.</p>'}</td>`;
+      }).join('')}</tr>`).join('')}</tbody></table></div></details>` : '<p>The wire connections are unchanged.</p>'}</div></details>
+    ${r.matching.notes.length ? `<details class="row"><summary><span class="minus-dot" aria-hidden="true">?</span><span class="rl">Why some changes need checking</span><span class="chev" aria-hidden="true">▸</span></summary><div class="row-body">${r.matching.notes.map(n => `<p>${esc(n)}</p>`).join('')}</div></details>` : ''}
+    </div>
+    ${r.truncated ? '<p class="tiny">Showing the first 100 warnings and connection changes.</p>' : ''}`;
 }
 
 // Keep only the saved upload IDs in the URL; always recompute comparison facts.
